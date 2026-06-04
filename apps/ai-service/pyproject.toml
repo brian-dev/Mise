@@ -42,3 +42,6 @@ strict = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "live: hits the real Claude API; requires a non-empty ANTHROPIC_API_KEY",
+]
