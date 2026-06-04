@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # Ingredient canonicalization fuzzy-match cutoff (AI_LAYER §5).
     ingredient_match_threshold: float = 0.6
 
+    # CORS allow-list for the local web harness (comma-separated origins).
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
     # A full 14-day, all-meal plan with inline recipes can be large; stream above ~16k.
     max_output_tokens: int = 32000
 

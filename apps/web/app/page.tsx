@@ -1,16 +1,272 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
 import { MEAL_TYPES, type MealType } from "@mise/shared";
 
+import {
+  api,
+  type Household,
+  type MealPlanDetail,
+  type PantryItem,
+  type ShoppingListDetail,
+} from "../lib/api";
+
+const card: React.CSSProperties = {
+  border: "1px solid #e2ddd2",
+  borderRadius: 10,
+  padding: "1rem 1.25rem",
+  marginBottom: "1rem",
+  background: "#fff",
+};
+
 export default function Home() {
+  const [households, setHouseholds] = useState<Household[]>([]);
+  const [householdId, setHouseholdId] = useState<string>("");
+  const [newName, setNewName] = useState("");
+  const [pantry, setPantry] = useState<PantryItem[]>([]);
+
+  // Generation form
+  const [startDate, setStartDate] = useState("2026-06-10");
+  const [endDate, setEndDate] = useState("2026-06-12");
+  const [size, setSize] = useState(2);
+  const [mealTypes, setMealTypes] = useState<MealType[]>(["dinner"]);
+  const [flags, setFlags] = useState("vegetarian");
+  const [avoid, setAvoid] = useState("no mushrooms");
+  const [budget, setBudget] = useState("60");
+
+  const [plan, setPlan] = useState<MealPlanDetail | null>(null);
+  const [shopping, setShopping] = useState<ShoppingListDetail | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshHouseholds = useCallback(async () => {
+    setHouseholds(await api.listHouseholds());
+  }, []);
+
+  const refreshPantry = useCallback(async (id: string) => {
+    if (id) setPantry(await api.getPantry(id));
+  }, []);
+
+  useEffect(() => {
+    refreshHouseholds().catch((e) => setError(String(e)));
+  }, [refreshHouseholds]);
+
+  useEffect(() => {
+    if (householdId) refreshPantry(householdId).catch((e) => setError(String(e)));
+  }, [householdId, refreshPantry]);
+
+  async function run(label: string, fn: () => Promise<void>) {
+    setBusy(label);
+    setError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const createHousehold = () =>
+    run("household", async () => {
+      const h = await api.createHousehold(newName || "My Household");
+      setNewName("");
+      await refreshHouseholds();
+      setHouseholdId(h.id);
+    });
+
+  const toggleMeal = (m: MealType) =>
+    setMealTypes((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
+
+  const generate = () =>
+    run("generate", async () => {
+      setShopping(null);
+      const res = await api.generate({
+        household_id: householdId,
+        start_date: startDate,
+        end_date: endDate,
+        household_size: size,
+        meal_types: mealTypes,
+        dietary: {
+          flags: flags.split(",").map((s) => s.trim()).filter(Boolean),
+          avoid_text: avoid || null,
+        },
+        budget: budget ? Number(budget) : null,
+      });
+      setPlan(await api.getMealPlan(res.meal_plan_id));
+    });
+
+  const buildList = () =>
+    run("shopping", async () => {
+      if (!plan) return;
+      const summary = await api.buildShoppingList(plan.meal_plan_id);
+      setShopping(await api.getShoppingList(summary.shopping_list_id));
+    });
+
+  const cook = (mealId: string) =>
+    run(`cook-${mealId}`, async () => {
+      await api.cookMeal(mealId);
+      if (plan) setPlan(await api.getMealPlan(plan.meal_plan_id));
+      await refreshPantry(householdId);
+    });
+
   return (
-    <main style={{ fontFamily: "system-ui", padding: "2rem", maxWidth: 640 }}>
-      <h1>Mise</h1>
-      <p>AI meal planning — plan, shop, cook, repeat.</p>
-      <p>Meal types from the shared package:</p>
-      <ul>
-        {MEAL_TYPES.map((m: MealType) => (
-          <li key={m}>{m}</li>
-        ))}
-      </ul>
+    <main style={{ fontFamily: "system-ui", maxWidth: 760, margin: "0 auto", padding: "2rem 1rem" }}>
+      <h1 style={{ marginBottom: 4 }}>Mise — dev harness</h1>
+      <p style={{ color: "#6b6256", marginTop: 0 }}>Verify the core loop end-to-end.</p>
+
+      {error && (
+        <div style={{ ...card, borderColor: "#c0392b", color: "#c0392b", whiteSpace: "pre-wrap" }}>
+          {error}
+        </div>
+      )}
+
+      {/* Household */}
+      <section style={card}>
+        <h2>1 · Household</h2>
+        <select value={householdId} onChange={(e) => setHouseholdId(e.target.value)} style={{ padding: 6 }}>
+          <option value="">— select —</option>
+          {households.map((h) => (
+            <option key={h.id} value={h.id}>
+              {h.name}
+            </option>
+          ))}
+        </select>
+        <div style={{ marginTop: 8 }}>
+          <input
+            placeholder="New household name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            style={{ padding: 6 }}
+          />
+          <button onClick={createHousehold} disabled={busy === "household"} style={{ marginLeft: 8 }}>
+            Create
+          </button>
+        </div>
+        {householdId && (
+          <div style={{ marginTop: 10 }}>
+            <strong>Pantry</strong>
+            {pantry.length === 0 ? (
+              <div style={{ color: "#6b6256" }}>empty</div>
+            ) : (
+              <ul style={{ margin: "4px 0" }}>
+                {pantry.map((p) => (
+                  <li key={`${p.name}-${p.unit}`}>
+                    {p.quantity} {p.unit} {p.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Generate */}
+      <section style={card}>
+        <h2>2 · Generate a plan</h2>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <label>
+            Start <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </label>
+          <label>
+            End <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </label>
+          <label>
+            Household size{" "}
+            <input
+              type="number"
+              min={1}
+              value={size}
+              onChange={(e) => setSize(Number(e.target.value))}
+              style={{ width: 56 }}
+            />
+          </label>
+          <label>
+            Budget $<input value={budget} onChange={(e) => setBudget(e.target.value)} style={{ width: 70 }} />
+          </label>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          Meals:{" "}
+          {MEAL_TYPES.map((m) => (
+            <label key={m} style={{ marginRight: 10 }}>
+              <input type="checkbox" checked={mealTypes.includes(m)} onChange={() => toggleMeal(m)} /> {m}
+            </label>
+          ))}
+        </div>
+        <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <label>
+            Dietary flags <input value={flags} onChange={(e) => setFlags(e.target.value)} />
+          </label>
+          <label>
+            Avoid <input value={avoid} onChange={(e) => setAvoid(e.target.value)} />
+          </label>
+        </div>
+        <button
+          onClick={generate}
+          disabled={!householdId || mealTypes.length === 0 || busy === "generate"}
+          style={{ marginTop: 12 }}
+        >
+          {busy === "generate" ? "Generating… (calls Claude)" : "Generate plan"}
+        </button>
+      </section>
+
+      {/* Plan */}
+      {plan && (
+        <section style={card}>
+          <h2>3 · Plan ({plan.status})</h2>
+          {plan.days.map((d) => (
+            <div key={d.date} style={{ marginBottom: 8 }}>
+              <strong>{d.date}</strong>
+              {d.meals.map((m) => (
+                <div key={m.meal_id} style={{ marginLeft: 12 }}>
+                  [{m.meal_type}] {m.recipe_title} — {m.servings} servings{" "}
+                  {m.cooked_at ? (
+                    <span style={{ color: "#2e7d32" }}>✓ cooked</span>
+                  ) : (
+                    <button onClick={() => cook(m.meal_id)} disabled={busy === `cook-${m.meal_id}`}>
+                      Cook
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+          <button onClick={buildList} disabled={busy === "shopping"} style={{ marginTop: 8 }}>
+            Build shopping list
+          </button>
+        </section>
+      )}
+
+      {/* Shopping list */}
+      {shopping && (
+        <section style={card}>
+          <h2>4 · Shopping list</h2>
+          <div>
+            Estimated total: <strong>${shopping.estimated_total}</strong>
+          </div>
+          <table style={{ marginTop: 8, borderCollapse: "collapse", width: "100%" }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid #e2ddd2" }}>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shopping.items.map((it) => (
+                <tr key={`${it.name}-${it.unit}`}>
+                  <td>{it.name}</td>
+                  <td>
+                    {it.quantity_needed} {it.unit}
+                  </td>
+                  <td>{it.estimated_price ? `$${it.estimated_price}` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
     </main>
   );
 }

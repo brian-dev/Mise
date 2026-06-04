@@ -8,6 +8,7 @@ dist/
 .expo/
 .turbo/
 *.tsbuildinfo
+next-env.d.ts
 
 # Python / uv
 .venv/

@@ -9,7 +9,7 @@ unique constraint.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg
@@ -20,6 +20,116 @@ from .schemas import GeneratedMealPlan, GeneratedRecipe, MealPlanRequest
 
 def connect() -> psycopg.Connection:
     return psycopg.connect(settings.database_url)
+
+
+# --------------------------------------------------------------------------- #
+# Read/helper queries for the local web harness (dev convenience, not the final
+# client data path — ARCHITECTURE §9 has clients read Supabase directly).
+# --------------------------------------------------------------------------- #
+def create_household(conn: psycopg.Connection, name: str) -> dict[str, Any]:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute("insert into households (name) values (%s) returning id, name", (name,))
+        hid, hname = cur.fetchone()  # type: ignore[misc]
+    return {"id": hid, "name": hname}
+
+
+def list_households(conn: psycopg.Connection) -> list[dict[str, Any]]:
+    with conn.cursor() as cur:
+        cur.execute("select id, name from households order by created_at desc")
+        return [{"id": r[0], "name": r[1]} for r in cur.fetchall()]
+
+
+def get_pantry(conn: psycopg.Connection, household_id: UUID) -> list[dict[str, Any]]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select i.name, p.quantity, p.unit
+            from pantry_items p join ingredients i on i.id = p.ingredient_id
+            where p.household_id = %s
+            order by i.name
+            """,
+            (household_id,),
+        )
+        return [{"name": r[0], "quantity": r[1], "unit": r[2]} for r in cur.fetchall()]
+
+
+def get_meal_plan(conn: psycopg.Connection, meal_plan_id: UUID) -> dict[str, Any]:
+    with conn.cursor() as cur:
+        cur.execute(
+            "select status, start_date, end_date, budget from meal_plans where id = %s",
+            (meal_plan_id,),
+        )
+        head = cur.fetchone()
+        if head is None:
+            raise ValueError(f"meal_plan {meal_plan_id} not found")
+
+        cur.execute(
+            """
+            select d.date, m.id, m.meal_type, m.servings, m.cooked_at, r.title
+            from meal_plan_days d
+            join meals m on m.meal_plan_day_id = d.id
+            join recipes r on r.id = m.recipe_id
+            where d.meal_plan_id = %s
+            order by d.date, m.meal_type
+            """,
+            (meal_plan_id,),
+        )
+        days: dict[Any, list[dict[str, Any]]] = {}
+        for date_, meal_id, meal_type, servings, cooked_at, title in cur.fetchall():
+            days.setdefault(date_, []).append(
+                {
+                    "meal_id": meal_id,
+                    "meal_type": meal_type,
+                    "servings": servings,
+                    "cooked_at": cooked_at,
+                    "recipe_title": title,
+                }
+            )
+    return {
+        "meal_plan_id": meal_plan_id,
+        "status": head[0],
+        "start_date": head[1],
+        "end_date": head[2],
+        "budget": head[3],
+        "days": [{"date": d, "meals": meals} for d, meals in sorted(days.items())],
+    }
+
+
+def get_shopping_list(conn: psycopg.Connection, shopping_list_id: UUID) -> dict[str, Any]:
+    with conn.cursor() as cur:
+        cur.execute(
+            "select status, estimated_total from shopping_lists where id = %s",
+            (shopping_list_id,),
+        )
+        head = cur.fetchone()
+        if head is None:
+            raise ValueError(f"shopping_list {shopping_list_id} not found")
+        cur.execute(
+            """
+            select i.name, s.quantity_needed, s.unit, s.estimated_price, s.is_checked, s.source
+            from shopping_list_items s join ingredients i on i.id = s.ingredient_id
+            where s.shopping_list_id = %s
+            order by i.name
+            """,
+            (shopping_list_id,),
+        )
+        items = [
+            {
+                "name": r[0],
+                "quantity_needed": r[1],
+                "unit": r[2],
+                "estimated_price": r[3],
+                "is_checked": r[4],
+                "source": r[5],
+            }
+            for r in cur.fetchall()
+        ]
+    return {
+        "shopping_list_id": shopping_list_id,
+        "status": head[0],
+        "estimated_total": head[1],
+        "items": items,
+    }
 
 
 def normalize_name(name: str) -> str:

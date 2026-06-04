@@ -63,9 +63,18 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      pantry (floored at 0), with per-ingredient partial-use overrides; `manual` mode marks cooked
      only. `POST /v1/meals/{id}/cook`. **Verified against the live local Postgres** (rolled-back
      `db` tests: auto scaling, manual no-op, override, already-cooked guard).
+   - ✅ Web verification harness (`apps/web`, branch `feat/web-verification-harness`): minimal
+     Next.js page driving the whole loop (household → generate → plan → cook → shopping list)
+     against the AI service. Added CORS + read/helper endpoints (`GET/POST /v1/households`,
+     `GET …/pantry`, `GET /v1/meal-plans/{id}`, `GET /v1/shopping-lists/{id}`). **Verified in a
+     real browser**: page renders, browser→API fetch works (CORS), households + pantry load and
+     reflect depletion. Generate path is wired identically but needs a real key to exercise.
+     Dev harness only — not the auth'd production client.
    - TODO next: async job + Realtime wiring (ARCHITECTURE §5), recipe swap/iterate + AI pricing
      fallback (AI_LAYER §9), shopping-list "purchased" → pantry restock (spec §3.4/§3.5), then
      the token-cost benchmark (AI_LAYER §11) to set the free-tier limit.
+   - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
+     `cors_origins`); not built yet.
 
 ## Local toolchain (added 2026-06-04)
 - pnpm 9.15.0 (via corepack), uv 0.11.19 (brew). Node 20 (nvm). Root `.npmrc` sets `node-linker=hoisted` (Expo/RN need a flat node_modules under pnpm).

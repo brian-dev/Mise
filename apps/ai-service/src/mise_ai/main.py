@@ -10,12 +10,23 @@ are stubbed and will be implemented in the first AI-service feature PR:
 """
 
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from .db import connect, persist_meal_plan
+from .config import settings
+from .db import (
+    connect,
+    create_household,
+    get_meal_plan,
+    get_pantry,
+    get_shopping_list,
+    list_households,
+    persist_meal_plan,
+)
 from .generation import GenerationError, generate_meal_plan
 from .pantry import cook_meal
 from .schemas import GeneratedMealPlan, MealPlanRequest
@@ -23,11 +34,61 @@ from .shopping import build_shopping_list
 
 app = FastAPI(title="Mise AI Service", version="0.0.0")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/v1/health")
 def health() -> dict[str, str]:
     """Liveness/readiness probe (ARCHITECTURE.md §5)."""
     return {"status": "ok"}
+
+
+# --------------------------------------------------------------------------- #
+# Read/helper endpoints for the local web harness (dev convenience).
+# --------------------------------------------------------------------------- #
+class HouseholdCreate(BaseModel):
+    name: str
+
+
+@app.get("/v1/households")
+def households() -> list[dict[str, Any]]:
+    with connect() as conn:
+        return list_households(conn)
+
+
+@app.post("/v1/households")
+def new_household(req: HouseholdCreate) -> dict[str, Any]:
+    with connect() as conn:
+        return create_household(conn, req.name)
+
+
+@app.get("/v1/households/{household_id}/pantry")
+def pantry(household_id: UUID) -> list[dict[str, Any]]:
+    with connect() as conn:
+        return get_pantry(conn, household_id)
+
+
+@app.get("/v1/meal-plans/{meal_plan_id}")
+def meal_plan(meal_plan_id: UUID) -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            return get_meal_plan(conn, meal_plan_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@app.get("/v1/shopping-lists/{shopping_list_id}")
+def shopping_list(shopping_list_id: UUID) -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            return get_shopping_list(conn, shopping_list_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 class MealPlanUsage(BaseModel):
