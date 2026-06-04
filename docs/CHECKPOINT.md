@@ -58,9 +58,14 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      the USDA baseline (unit-matched; null when unit mismatch or no price), writes
      shopping_lists + items, reconciles vs budget. `POST /v1/shopping-lists/build`. **Verified
      against the live local Postgres** (rolled-back `db` test: pantry subtraction, pricing, over-budget).
+   - ✅ Pantry depletion on cook (`pantry.py`, branch `feat/pantry-depletion`): marking a meal
+     cooked sets `cooked_at` and, in `auto` mode, deducts `qty × servings/default_servings` from
+     pantry (floored at 0), with per-ingredient partial-use overrides; `manual` mode marks cooked
+     only. `POST /v1/meals/{id}/cook`. **Verified against the live local Postgres** (rolled-back
+     `db` tests: auto scaling, manual no-op, override, already-cooked guard).
    - TODO next: async job + Realtime wiring (ARCHITECTURE §5), recipe swap/iterate + AI pricing
-     fallback (AI_LAYER §9), pantry depletion on cook (spec §3.4), then the token-cost
-     benchmark (AI_LAYER §11) to set the free-tier limit.
+     fallback (AI_LAYER §9), shopping-list "purchased" → pantry restock (spec §3.4/§3.5), then
+     the token-cost benchmark (AI_LAYER §11) to set the free-tier limit.
 
 ## Local toolchain (added 2026-06-04)
 - pnpm 9.15.0 (via corepack), uv 0.11.19 (brew). Node 20 (nvm). Root `.npmrc` sets `node-linker=hoisted` (Expo/RN need a flat node_modules under pnpm).

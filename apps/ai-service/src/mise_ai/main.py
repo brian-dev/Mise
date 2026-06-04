@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from .db import connect, persist_meal_plan
 from .generation import GenerationError, generate_meal_plan
+from .pantry import cook_meal
 from .schemas import GeneratedMealPlan, MealPlanRequest
 from .shopping import build_shopping_list
 
@@ -101,4 +102,41 @@ def build_list(req: ShoppingListRequest) -> ShoppingListResponse:
         items_total=result.items_total,
         items_priced=result.items_priced,
         items_unpriced=result.items_unpriced,
+    )
+
+
+class CookRequest(BaseModel):
+    # Optional partial-use overrides: ingredient_id -> actual quantity used.
+    overrides: dict[UUID, Decimal] | None = None
+
+
+class DeductionOut(BaseModel):
+    ingredient_id: UUID
+    unit: str
+    amount: Decimal
+
+
+class CookResponse(BaseModel):
+    meal_id: UUID
+    mode: str
+    deductions: list[DeductionOut]
+
+
+@app.post("/v1/meals/{meal_id}/cook", response_model=CookResponse)
+def cook(meal_id: UUID, req: CookRequest | None = None) -> CookResponse:
+    """Mark a meal cooked and deplete the pantry per the household mode (spec §3.4)."""
+    overrides = req.overrides if req else None
+    try:
+        with connect() as conn:
+            result = cook_meal(conn, meal_id, overrides)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+
+    return CookResponse(
+        meal_id=result.meal_id,
+        mode=result.mode,
+        deductions=[
+            DeductionOut(ingredient_id=d.ingredient_id, unit=d.unit, amount=d.amount)
+            for d in result.deductions
+        ],
     )

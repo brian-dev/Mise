@@ -1,0 +1,96 @@
+"""Pantry depletion on cook (spec §3.4).
+
+Marking a meal cooked optionally deducts its ingredients from the household
+pantry. Deduction amount per ingredient:
+
+    quantity_deducted = recipe_ingredient.quantity * (meal.servings / recipe.default_servings)
+
+Behavior depends on the household's `pantry_depletion_mode`:
+  * auto   -> deduct automatically on cook.
+  * manual -> mark cooked only; the user removes items themselves.
+
+Partial-use handling (spec §3.4): callers may pass per-ingredient `overrides`
+(actual quantity used) to replace the computed amount. Pantry quantities never
+go negative — if on-hand is less than the deduction, it floors at zero.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from decimal import Decimal
+from uuid import UUID
+
+import psycopg
+
+
+@dataclass
+class Deduction:
+    ingredient_id: UUID
+    unit: str
+    amount: Decimal
+
+
+@dataclass
+class CookResult:
+    meal_id: UUID
+    mode: str
+    deductions: list[Deduction] = field(default_factory=list)
+
+
+def cook_meal(
+    conn: psycopg.Connection,
+    meal_id: UUID,
+    overrides: dict[UUID, Decimal] | None = None,
+) -> CookResult:
+    overrides = overrides or {}
+
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            """
+            select m.cooked_at, m.servings, m.recipe_id,
+                   r.default_servings, mp.household_id, h.pantry_depletion_mode
+            from meals m
+            join meal_plan_days d on d.id = m.meal_plan_day_id
+            join meal_plans mp on mp.id = d.meal_plan_id
+            join households h on h.id = mp.household_id
+            join recipes r on r.id = m.recipe_id
+            where m.id = %s
+            """,
+            (meal_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            raise ValueError(f"meal {meal_id} not found (or has no recipe)")
+        cooked_at, servings, recipe_id, default_servings, household_id, mode = row
+        if cooked_at is not None:
+            raise ValueError(f"meal {meal_id} is already cooked")
+
+        cur.execute("update meals set cooked_at = now() where id = %s", (meal_id,))
+
+        deductions: list[Deduction] = []
+        if mode == "auto":
+            factor = Decimal(servings) / Decimal(default_servings)
+            cur.execute(
+                """
+                select ingredient_id, quantity, unit
+                from recipe_ingredients
+                where recipe_id = %s
+                """,
+                (recipe_id,),
+            )
+            for ingredient_id, quantity, unit in cur.fetchall():
+                amount = overrides.get(ingredient_id, quantity * factor)
+                # Deduct from the matching pantry row, flooring at zero. Nothing
+                # on hand -> nothing to deduct.
+                cur.execute(
+                    """
+                    update pantry_items
+                    set quantity = greatest(0, quantity - %s)
+                    where household_id = %s and ingredient_id = %s and unit = %s
+                    """,
+                    (amount, household_id, ingredient_id, unit),
+                )
+                if cur.rowcount:
+                    deductions.append(Deduction(ingredient_id, unit, amount))
+
+    return CookResult(meal_id=meal_id, mode=mode, deductions=deductions)
