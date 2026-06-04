@@ -22,6 +22,7 @@ Name from *mise en place*. Full vision in `docs/PRODUCT_SPEC.md`.
 6. `supabase/seed/ingredients.sql` — ~40 starter ingredients with placeholder baseline prices.
 7. `supabase/config.toml` — Supabase CLI config; seed via `./seed/*.sql`; analytics off (Colima vz). (committed 2cbab6d)
 8. `docs/AI_LAYER.md` — AI generation design: one-shot full-plan tool-use schema, prompt layering w/ caching, ingredient canonicalization (pg_trgm ≥0.6), validation/repair, persistence mapping, pricing fallback, model selection, token-cost benchmark plan.
+9. Monorepo scaffold (pnpm + Turborepo): `apps/web` (Next 14), `apps/mobile` (Expo SDK 52), `apps/ai-service` (FastAPI/uv via package.json shim), `packages/shared` (`@mise/shared` — enums + AI contract types mirroring the schema). Validated: `turbo run typecheck` green across all 5 tasks; `pnpm install` + `uv sync` clean; ai-service pytest+ruff pass.
 
 ## Validated (2026-06-04)
 - Migrations + seed now run cleanly against a local Supabase stack. Confirmed in the live DB:
@@ -41,9 +42,14 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
 ## Next steps (in order)
 1. ~~Supabase CLI config so `supabase start` applies migrations + seed automatically.~~ ✅ Done 2026-06-04 (see Validated section).
 2. ~~AI layer design (prompt + structured-output schema).~~ ✅ Done 2026-06-04 → `docs/AI_LAYER.md`.
-3. **Monorepo scaffolding** ← next: `apps/web`, `apps/mobile`, `apps/ai-service`, `packages/shared` (pnpm + Turborepo).
-4. Build v1 core loop: auth → household → generate plan → shopping list → pantry → cook/deplete.
+3. ~~Monorepo scaffolding (pnpm + Turborepo).~~ ✅ Done 2026-06-04.
+4. **Build v1 core loop** ← next: auth → household → generate plan → shopping list → pantry → cook/deplete.
    - First AI-service PR owns the token-cost benchmark (`docs/AI_LAYER.md` §11) to set the free-tier limit.
+
+## Local toolchain (added 2026-06-04)
+- pnpm 9.15.0 (via corepack), uv 0.11.19 (brew). Node 20 (nvm). Root `.npmrc` sets `node-linker=hoisted` (Expo/RN need a flat node_modules under pnpm).
+- Run all: `pnpm install` then `pnpm exec turbo run <task>`. AI service: `cd apps/ai-service && uv sync`.
+- `node_modules/`, `.venv/`, build outputs are gitignored (root `.gitignore`).
 
 ## Memory
 Project facts persist in auto-memory under the Mise project (project_mise.md, user_profile.md).

@@ -1,0 +1,13 @@
+{
+  "name": "@mise/ai-service",
+  "version": "0.0.0",
+  "private": true,
+  "//": "Shim only. This is a Python (uv) project; scripts shell out to uv so Turborepo can orchestrate it alongside the JS apps. No npm dependencies here on purpose.",
+  "scripts": {
+    "dev": "uv run uvicorn mise_ai.main:app --reload --port 8000",
+    "build": "uv sync --frozen",
+    "lint": "uv run ruff check .",
+    "typecheck": "uv run mypy src",
+    "test": "uv run pytest"
+  }
+}

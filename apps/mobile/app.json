@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Mise",
+    "slug": "mise",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mise.app"
+    },
+    "android": {
+      "package": "com.mise.app"
+    }
+  }
+}

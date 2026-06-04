@@ -1,0 +1,7 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+# apps/ai-service is a Python (uv) project included here only via a package.json
+# "shim" (scripts that shell out to uv). Turborepo derives its task graph from this
+# workspace, so the shim must be a member for `turbo run` to orchestrate it. The shim
+# declares no npm dependencies, so pnpm has no Python deps to resolve.
