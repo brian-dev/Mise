@@ -1,0 +1,20 @@
+#!/bin/sh
+# Block direct pushes to main. New work goes on a branch and lands via PR
+# (see CLAUDE.md). Enabled per-clone with: git config core.hooksPath .githooks
+#
+# Emergency bypass (use sparingly): git push --no-verify
+
+protected="main"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    "refs/heads/$protected")
+      echo "✋ Direct pushes to '$protected' are blocked by .githooks/pre-push." >&2
+      echo "   Create a branch and open a PR instead (see CLAUDE.md)." >&2
+      echo "   To override in an emergency: git push --no-verify" >&2
+      exit 1
+      ;;
+  esac
+done
+
+exit 0

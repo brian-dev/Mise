@@ -9,6 +9,16 @@
 - `main` stays clean and releasable at all times.
 - The only exception is an explicit, one-off instruction from the user to commit to `main`.
 
+**Enforcement:** a committed pre-push hook (`.githooks/pre-push`) blocks direct pushes to
+`main`. Enable it once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+This is client-side (bypassable with `git push --no-verify`). Server-side branch
+protection needs GitHub Pro or a public repo — revisit if the repo goes Pro/public.
+
 ## Orientation
 - Start a session by reading `docs/CHECKPOINT.md` — it points to the current state and the
   other design docs (`PRODUCT_SPEC.md`, `ARCHITECTURE.md`, `AI_LAYER.md`).
