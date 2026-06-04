@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import date
 from enum import StrEnum
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -64,6 +65,7 @@ class Dietary(BaseModel):
 
 
 class MealPlanRequest(BaseModel):
+    household_id: UUID
     start_date: date
     end_date: date
     household_size: int = Field(ge=1, description="Default servings per meal.")

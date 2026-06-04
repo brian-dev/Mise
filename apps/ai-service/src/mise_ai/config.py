@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     meal_plan_model: str = "claude-sonnet-4-6"
     recipe_model: str = "claude-haiku-4-5"
 
+    # Privileged Postgres connection (ARCHITECTURE §6 — the AI service uses a
+    # service-role/superuser connection and does its own authz). Defaults to the
+    # local Supabase stack.
+    database_url: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+    # Ingredient canonicalization fuzzy-match cutoff (AI_LAYER §5).
+    ingredient_match_threshold: float = 0.6
+
     # A full 14-day, all-meal plan with inline recipes can be large; stream above ~16k.
     max_output_tokens: int = 32000
 

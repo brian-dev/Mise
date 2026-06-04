@@ -14,6 +14,7 @@ from mise_ai.schemas import MealPlanRequest
 
 def _req(**over: object) -> MealPlanRequest:
     base = {
+        "household_id": "00000000-0000-0000-0000-000000000001",
         "start_date": "2026-06-10",
         "end_date": "2026-06-11",
         "household_size": 4,
