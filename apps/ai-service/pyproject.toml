@@ -11,6 +11,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "httpx>=0.27",
+    "psycopg[binary]>=3.2",
 ]
 
 [dependency-groups]
@@ -44,4 +45,5 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "live: hits the real Claude API; requires a non-empty ANTHROPIC_API_KEY",
+    "db: requires a reachable Postgres (local Supabase stack)",
 ]

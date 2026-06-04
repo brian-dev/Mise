@@ -28,6 +28,7 @@ pytestmark = [
 def test_live_two_day_dinner_plan() -> None:
     req = MealPlanRequest.model_validate(
         {
+            "household_id": "00000000-0000-0000-0000-000000000001",
             "start_date": "2026-06-10",
             "end_date": "2026-06-11",
             "household_size": 2,

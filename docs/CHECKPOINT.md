@@ -44,13 +44,17 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
 2. ~~AI layer design (prompt + structured-output schema).~~ ✅ Done 2026-06-04 → `docs/AI_LAYER.md`.
 3. ~~Monorepo scaffolding (pnpm + Turborepo).~~ ✅ Done 2026-06-04.
 4. **Build v1 core loop** (in progress): auth → household → generate plan → shopping list → pantry → cook/deplete.
-   - ⏳ Meal-plan generation core landed on branch `feat/meal-plan-generation` (`apps/ai-service`):
-     prompt + `emit_meal_plan` forced-tool schema, prompt caching on system+tool, validation +
-     one repair retry, token-usage capture, `POST /v1/meal-plans/generate`. Offline tests pass
-     (stubbed Claude); a `live`-marked test verifies end-to-end but **needs a real ANTHROPIC_API_KEY**.
-     ⚠️ NOT yet verified against the live API — this env only has empty key placeholders.
-   - TODO next on this branch / follow-ups: ingredient canonicalization + DB persistence
-     (AI_LAYER §5,§7), async job + Realtime wiring, then the token-cost benchmark (§11).
+   - ✅ Meal-plan generation core (`apps/ai-service`, merged #2): prompt + `emit_meal_plan`
+     forced-tool schema, prompt caching on system+tool, validation + one repair retry,
+     token-usage capture, `POST /v1/meal-plans/generate`. Offline tests pass (stubbed Claude).
+     ⚠️ Generation NOT yet verified against the live Claude API — this env has only empty key
+     placeholders; `live`-marked test needs a real ANTHROPIC_API_KEY (`uv run pytest -m live`).
+   - ✅ Canonicalization + persistence (`db.py`, branch `feat/meal-plan-persistence`): pg_trgm
+     ingredient match (≥0.6 reuse, else insert), transactional persist of plan→days→meals→
+     recipes→recipe_ingredients with in-plan recipe de-dup. **Verified against the live local
+     Postgres** (`db`-marked test, rolled back). Endpoint now persists and returns `meal_plan_id`.
+   - TODO next: async job + Realtime wiring (ARCHITECTURE §5), recipe swap/iterate + pricing
+     endpoints, then the token-cost benchmark (AI_LAYER §11) to set the free-tier limit.
 
 ## Local toolchain (added 2026-06-04)
 - pnpm 9.15.0 (via corepack), uv 0.11.19 (brew). Node 20 (nvm). Root `.npmrc` sets `node-linker=hoisted` (Expo/RN need a flat node_modules under pnpm).
