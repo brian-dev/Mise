@@ -1,26 +1,25 @@
 """Live end-to-end smoke test against the real Claude API.
 
-Skipped unless a real ANTHROPIC_API_KEY is set (the value must be non-empty).
-Run locally with your key to validate forced tool use, prompt caching, and
-usage capture:
+Skipped unless a real API key is configured. The key can come from the shell
+env OR apps/ai-service/.env (both feed the service config), so either works:
 
+    uv run pytest -m live -q                       # key in .env
     ANTHROPIC_API_KEY=sk-ant-... uv run pytest -m live -q
 """
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
+from mise_ai.config import settings
 from mise_ai.generation import generate_meal_plan
 from mise_ai.schemas import MealPlanRequest
 
 pytestmark = [
     pytest.mark.live,
     pytest.mark.skipif(
-        not os.environ.get("ANTHROPIC_API_KEY"),
-        reason="no real ANTHROPIC_API_KEY in env",
+        not settings.anthropic_api_key,
+        reason="no ANTHROPIC_API_KEY configured (shell env or .env)",
     ),
 ]
 
