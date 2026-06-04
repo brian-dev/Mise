@@ -53,8 +53,14 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      ingredient match (≥0.6 reuse, else insert), transactional persist of plan→days→meals→
      recipes→recipe_ingredients with in-plan recipe de-dup. **Verified against the live local
      Postgres** (`db`-marked test, rolled back). Endpoint now persists and returns `meal_plan_id`.
-   - TODO next: async job + Realtime wiring (ARCHITECTURE §5), recipe swap/iterate + pricing
-     endpoints, then the token-cost benchmark (AI_LAYER §11) to set the free-tier limit.
+   - ✅ Shopping-list builder (`shopping.py`, branch `feat/shopping-list-builder`): aggregates
+     required quantities (scaled by servings/default_servings), subtracts pantry, prices against
+     the USDA baseline (unit-matched; null when unit mismatch or no price), writes
+     shopping_lists + items, reconciles vs budget. `POST /v1/shopping-lists/build`. **Verified
+     against the live local Postgres** (rolled-back `db` test: pantry subtraction, pricing, over-budget).
+   - TODO next: async job + Realtime wiring (ARCHITECTURE §5), recipe swap/iterate + AI pricing
+     fallback (AI_LAYER §9), pantry depletion on cook (spec §3.4), then the token-cost
+     benchmark (AI_LAYER §11) to set the free-tier limit.
 
 ## Local toolchain (added 2026-06-04)
 - pnpm 9.15.0 (via corepack), uv 0.11.19 (brew). Node 20 (nvm). Root `.npmrc` sets `node-linker=hoisted` (Expo/RN need a flat node_modules under pnpm).
