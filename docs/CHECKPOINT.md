@@ -20,6 +20,8 @@ Name from *mise en place*. Full vision in `docs/PRODUCT_SPEC.md`.
 4. `supabase/migrations/0002_rls.sql` — RLS on the household-membership model; `is_household_member`/`is_household_owner` SECURITY DEFINER helpers.
 5. `supabase/migrations/0003_auth_hooks.sql` — auto-create `public.users` profile on auth sign-up.
 6. `supabase/seed/ingredients.sql` — ~40 starter ingredients with placeholder baseline prices.
+7. `supabase/config.toml` — Supabase CLI config; seed via `./seed/*.sql`; analytics off (Colima vz). (committed 2cbab6d)
+8. `docs/AI_LAYER.md` — AI generation design: one-shot full-plan tool-use schema, prompt layering w/ caching, ingredient canonicalization (pg_trgm ≥0.6), validation/repair, persistence mapping, pricing fallback, model selection, token-cost benchmark plan.
 
 ## Validated (2026-06-04)
 - Migrations + seed now run cleanly against a local Supabase stack. Confirmed in the live DB:
@@ -38,9 +40,10 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
 
 ## Next steps (in order)
 1. ~~Supabase CLI config so `supabase start` applies migrations + seed automatically.~~ ✅ Done 2026-06-04 (see Validated section).
-2. **AI layer design** ← next: prompt + structured-output (tool-use/JSON) schema for meal-plan generation; recipe iteration flow; token-cost benchmark to set free-tier limits.
-3. Monorepo scaffolding (`apps/web`, `apps/mobile`, `apps/ai-service`, `packages/shared`).
+2. ~~AI layer design (prompt + structured-output schema).~~ ✅ Done 2026-06-04 → `docs/AI_LAYER.md`.
+3. **Monorepo scaffolding** ← next: `apps/web`, `apps/mobile`, `apps/ai-service`, `packages/shared` (pnpm + Turborepo).
 4. Build v1 core loop: auth → household → generate plan → shopping list → pantry → cook/deplete.
+   - First AI-service PR owns the token-cost benchmark (`docs/AI_LAYER.md` §11) to set the free-tier limit.
 
 ## Memory
 Project facts persist in auto-memory under the Mise project (project_mise.md, user_profile.md).
