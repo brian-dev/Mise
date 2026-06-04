@@ -43,8 +43,14 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
 1. ~~Supabase CLI config so `supabase start` applies migrations + seed automatically.~~ ✅ Done 2026-06-04 (see Validated section).
 2. ~~AI layer design (prompt + structured-output schema).~~ ✅ Done 2026-06-04 → `docs/AI_LAYER.md`.
 3. ~~Monorepo scaffolding (pnpm + Turborepo).~~ ✅ Done 2026-06-04.
-4. **Build v1 core loop** ← next: auth → household → generate plan → shopping list → pantry → cook/deplete.
-   - First AI-service PR owns the token-cost benchmark (`docs/AI_LAYER.md` §11) to set the free-tier limit.
+4. **Build v1 core loop** (in progress): auth → household → generate plan → shopping list → pantry → cook/deplete.
+   - ⏳ Meal-plan generation core landed on branch `feat/meal-plan-generation` (`apps/ai-service`):
+     prompt + `emit_meal_plan` forced-tool schema, prompt caching on system+tool, validation +
+     one repair retry, token-usage capture, `POST /v1/meal-plans/generate`. Offline tests pass
+     (stubbed Claude); a `live`-marked test verifies end-to-end but **needs a real ANTHROPIC_API_KEY**.
+     ⚠️ NOT yet verified against the live API — this env only has empty key placeholders.
+   - TODO next on this branch / follow-ups: ingredient canonicalization + DB persistence
+     (AI_LAYER §5,§7), async job + Realtime wiring, then the token-cost benchmark (§11).
 
 ## Local toolchain (added 2026-06-04)
 - pnpm 9.15.0 (via corepack), uv 0.11.19 (brew). Node 20 (nvm). Root `.npmrc` sets `node-linker=hoisted` (Expo/RN need a flat node_modules under pnpm).
