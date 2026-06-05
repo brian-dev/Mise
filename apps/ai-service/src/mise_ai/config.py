@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     # CORS allow-list for the local web harness (comma-separated origins).
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
+    # Supabase auth (ARCHITECTURE §4). Default is the local-stack JWT secret.
+    # require_auth gates enforcement: kept off until the web login UI lands so the
+    # no-login harness keeps working; the JWT/membership mechanism is always built
+    # and tested. Flip to true (and set the real secret) once clients send tokens.
+    supabase_jwt_secret: str = "super-secret-jwt-token-with-at-least-32-characters-long"
+    supabase_jwt_aud: str = "authenticated"
+    require_auth: bool = False
+
     # A full 14-day, all-meal plan with inline recipes can be large; stream above ~16k.
     max_output_tokens: int = 32000
 

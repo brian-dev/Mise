@@ -83,9 +83,20 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      Migration `0004` makes `generation_jobs.requested_by` nullable (pre-auth). **Verified**: job
      lifecycle over HTTP (202→running→failed w/o key) and the polling UI in a browser (status +
      error surfaced). Realtime push (vs polling) is a later enhancement.
-   - TODO next: recipe swap/iterate + AI pricing fallback (AI_LAYER §9), per-household price
-     calibration, parallel/streaming generation for faster multi-day plans, auth + RLS-aware
-     client, then the token-cost benchmark (AI_LAYER §11) to set the free-tier limit.
+   - ⏳ Auth — part (a) backend (branch `feat/auth-jwt-backend`): AI service verifies Supabase
+     HS256 JWTs (`auth.py`), derives the user from `sub`, and authorizes household membership in
+     code (ARCHITECTURE §4). Gated by `settings.require_auth` (default **off** so the no-login
+     harness keeps working); the mechanism is fully built + tested. `create_household` adds the
+     creator as owner; `list_households` scopes to the user. **Verified**: JWT verification
+     (wrong secret/aud/expired → 401), membership isolation test (live PG), and HTTP enforcement
+     with `require_auth=true` (no-token 401 / member 200 / non-member 403 / scoped listing).
+     ⚠️ Membership wired on generate + households + pantry; the indirect endpoints
+     (meal-plan GET, shopping build/get, cook, purchase) still need household-resolution checks
+     before `require_auth` is flipped on.
+   - TODO next: auth part (b) — web Supabase login + send JWT + Supabase-direct reads, then flip
+     `require_auth` on (after covering the indirect endpoints). Then recipe swap/iterate + AI
+     pricing fallback (AI_LAYER §9), per-household price calibration, parallel/streaming
+     generation, and the token-cost benchmark (AI_LAYER §11).
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

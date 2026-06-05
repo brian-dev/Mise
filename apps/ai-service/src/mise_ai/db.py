@@ -27,16 +27,38 @@ def connect() -> psycopg.Connection:
 # Read/helper queries for the local web harness (dev convenience, not the final
 # client data path — ARCHITECTURE §9 has clients read Supabase directly).
 # --------------------------------------------------------------------------- #
-def create_household(conn: psycopg.Connection, name: str) -> dict[str, Any]:
+def create_household(
+    conn: psycopg.Connection, name: str, owner_user_id: UUID | None = None
+) -> dict[str, Any]:
     with conn.transaction(), conn.cursor() as cur:
         cur.execute("insert into households (name) values (%s) returning id, name", (name,))
         hid, hname = cur.fetchone()  # type: ignore[misc]
+        if owner_user_id is not None:
+            cur.execute(
+                "insert into household_members (household_id, user_id, role) "
+                "values (%s, %s, 'owner')",
+                (hid, owner_user_id),
+            )
     return {"id": hid, "name": hname}
 
 
-def list_households(conn: psycopg.Connection) -> list[dict[str, Any]]:
+def list_households(
+    conn: psycopg.Connection, user_id: UUID | None = None
+) -> list[dict[str, Any]]:
     with conn.cursor() as cur:
-        cur.execute("select id, name from households order by created_at desc")
+        if user_id is None:
+            # Anonymous dev mode (auth disabled): list all households.
+            cur.execute("select id, name from households order by created_at desc")
+        else:
+            cur.execute(
+                """
+                select h.id, h.name from households h
+                join household_members m on m.household_id = h.id
+                where m.user_id = %s
+                order by h.created_at desc
+                """,
+                (user_id,),
+            )
         return [{"id": r[0], "name": r[1]} for r in cur.fetchall()]
 
 

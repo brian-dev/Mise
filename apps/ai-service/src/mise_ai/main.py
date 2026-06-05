@@ -13,10 +13,11 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from .auth import current_user, require_membership
 from .config import settings
 from .db import (
     connect,
@@ -59,20 +60,25 @@ class HouseholdCreate(BaseModel):
 
 
 @app.get("/v1/households")
-def households() -> list[dict[str, Any]]:
+def households(user: UUID | None = Depends(current_user)) -> list[dict[str, Any]]:
     with connect() as conn:
-        return list_households(conn)
+        return list_households(conn, user)
 
 
 @app.post("/v1/households")
-def new_household(req: HouseholdCreate) -> dict[str, Any]:
+def new_household(
+    req: HouseholdCreate, user: UUID | None = Depends(current_user)
+) -> dict[str, Any]:
     with connect() as conn:
-        return create_household(conn, req.name)
+        return create_household(conn, req.name, owner_user_id=user)
 
 
 @app.get("/v1/households/{household_id}/pantry")
-def pantry(household_id: UUID) -> list[dict[str, Any]]:
+def pantry(
+    household_id: UUID, user: UUID | None = Depends(current_user)
+) -> list[dict[str, Any]]:
     with connect() as conn:
+        require_membership(conn, user, household_id)
         return get_pantry(conn, household_id)
 
 
@@ -135,15 +141,20 @@ def _run_meal_plan_job(job_id: UUID, req: MealPlanRequest) -> None:
 
 
 @app.post("/v1/meal-plans/generate", status_code=202, response_model=JobAccepted)
-def generate(req: MealPlanRequest, background: BackgroundTasks) -> JobAccepted:
+def generate(
+    req: MealPlanRequest,
+    background: BackgroundTasks,
+    user: UUID | None = Depends(current_user),
+) -> JobAccepted:
     """Queue a meal-plan generation job and return immediately (ARCHITECTURE §5).
 
     The client polls GET /v1/jobs/{job_id}; on done, result.meal_plan_id points
     at the persisted draft. (Realtime push is a later enhancement.)
     """
     with connect() as conn:
+        require_membership(conn, user, req.household_id)
         job_id = create_generation_job(
-            conn, req.household_id, "meal_plan", req.model_dump(mode="json")
+            conn, req.household_id, "meal_plan", req.model_dump(mode="json"), requested_by=user
         )
     background.add_task(_run_meal_plan_job, job_id, req)
     return JobAccepted(job_id=job_id, status="queued")
