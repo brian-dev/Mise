@@ -99,12 +99,19 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      creator as owner; `list_households` scopes to the user. **Verified**: JWT verification
      (wrong secret/aud/expired → 401), membership isolation test (live PG), and HTTP enforcement
      with `require_auth=true` (no-token 401 / member 200 / non-member 403 / scoped listing).
-     ⚠️ Membership wired on generate + households + pantry; the indirect endpoints
-     (meal-plan GET, shopping build/get, cook, purchase) still need household-resolution checks
-     before `require_auth` is flipped on.
-   - TODO next: auth part (b) — web Supabase login + send JWT + Supabase-direct reads, then flip
-     `require_auth` on (after covering the indirect endpoints). Then recipe swap/iterate + AI
-     pricing fallback (AI_LAYER §9), per-household price calibration, parallel/streaming
+     (Merged #11.)
+   - ✅ Auth — part (b) step 1: endpoint coverage (branch `feat/auth-cover-endpoints`). The
+     indirect/parent-scoped endpoints now resolve the owning household
+     (`household_for_meal_plan/shopping_list/meal` in `db.py`) and enforce membership:
+     meal-plan GET, shopping-list GET, shopping build, purchase, cook. **Verified**: resolver +
+     cross-member rejection test (live PG), and HTTP enforcement on `cook` with `require_auth=true`
+     (no-token 401 / non-member 403 / member 200 / already-cooked 409). Every household-scoped
+     endpoint is now membership-checked — safe to flip enforcement on in step 2.
+     Also: live Claude generation test now **passes against real Claude** (key in `.env`); `live`
+     marker is excluded from the default `pytest` run (paid).
+   - TODO next: auth part (b) step 2 — web Supabase login (sign in/up) + attach JWT to API calls +
+     create-household-on-first-login, then set `require_auth` on by default. Then recipe
+     swap/iterate + AI pricing fallback (AI_LAYER §9), price calibration, parallel/streaming
      generation, and the token-cost benchmark (AI_LAYER §11).
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.

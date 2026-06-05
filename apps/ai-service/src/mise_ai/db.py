@@ -62,6 +62,43 @@ def list_households(
         return [{"id": r[0], "name": r[1]} for r in cur.fetchall()]
 
 
+# --- household resolvers (for membership checks on parent-scoped resources) -- #
+def household_for_meal_plan(conn: psycopg.Connection, meal_plan_id: UUID) -> UUID:
+    with conn.cursor() as cur:
+        cur.execute("select household_id from meal_plans where id = %s", (meal_plan_id,))
+        row = cur.fetchone()
+    if row is None:
+        raise ValueError(f"meal_plan {meal_plan_id} not found")
+    return cast(UUID, row[0])
+
+
+def household_for_shopping_list(conn: psycopg.Connection, shopping_list_id: UUID) -> UUID:
+    with conn.cursor() as cur:
+        cur.execute(
+            "select mp.household_id from shopping_lists sl "
+            "join meal_plans mp on mp.id = sl.meal_plan_id where sl.id = %s",
+            (shopping_list_id,),
+        )
+        row = cur.fetchone()
+    if row is None:
+        raise ValueError(f"shopping_list {shopping_list_id} not found")
+    return cast(UUID, row[0])
+
+
+def household_for_meal(conn: psycopg.Connection, meal_id: UUID) -> UUID:
+    with conn.cursor() as cur:
+        cur.execute(
+            "select mp.household_id from meals m "
+            "join meal_plan_days d on d.id = m.meal_plan_day_id "
+            "join meal_plans mp on mp.id = d.meal_plan_id where m.id = %s",
+            (meal_id,),
+        )
+        row = cur.fetchone()
+    if row is None:
+        raise ValueError(f"meal {meal_id} not found")
+    return cast(UUID, row[0])
+
+
 def get_pantry(conn: psycopg.Connection, household_id: UUID) -> list[dict[str, Any]]:
     with conn.cursor() as cur:
         cur.execute(

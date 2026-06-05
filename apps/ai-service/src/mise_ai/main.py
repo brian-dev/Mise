@@ -27,6 +27,9 @@ from .db import (
     get_meal_plan,
     get_pantry,
     get_shopping_list,
+    household_for_meal,
+    household_for_meal_plan,
+    household_for_shopping_list,
     list_households,
     persist_meal_plan,
     set_job_status,
@@ -83,18 +86,26 @@ def pantry(
 
 
 @app.get("/v1/meal-plans/{meal_plan_id}")
-def meal_plan(meal_plan_id: UUID) -> dict[str, Any]:
+def meal_plan(
+    meal_plan_id: UUID, user: UUID | None = Depends(current_user)
+) -> dict[str, Any]:
     try:
         with connect() as conn:
+            require_membership(conn, user, household_for_meal_plan(conn, meal_plan_id))
             return get_meal_plan(conn, meal_plan_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @app.get("/v1/shopping-lists/{shopping_list_id}")
-def shopping_list(shopping_list_id: UUID) -> dict[str, Any]:
+def shopping_list(
+    shopping_list_id: UUID, user: UUID | None = Depends(current_user)
+) -> dict[str, Any]:
     try:
         with connect() as conn:
+            require_membership(
+                conn, user, household_for_shopping_list(conn, shopping_list_id)
+            )
             return get_shopping_list(conn, shopping_list_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -191,7 +202,9 @@ class ShoppingListResponse(BaseModel):
 
 
 @app.post("/v1/shopping-lists/build", response_model=ShoppingListResponse)
-def build_list(req: ShoppingListRequest) -> ShoppingListResponse:
+def build_list(
+    req: ShoppingListRequest, user: UUID | None = Depends(current_user)
+) -> ShoppingListResponse:
     """Build a draft shopping list from a meal plan (ARCHITECTURE §7, spec §3.5).
 
     Aggregates required quantities, subtracts the pantry, prices against the USDA
@@ -199,6 +212,7 @@ def build_list(req: ShoppingListRequest) -> ShoppingListResponse:
     """
     try:
         with connect() as conn:
+            require_membership(conn, user, household_for_meal_plan(conn, req.meal_plan_id))
             result = build_shopping_list(conn, req.meal_plan_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -226,10 +240,15 @@ class PurchaseResponse(BaseModel):
 
 
 @app.post("/v1/shopping-lists/{shopping_list_id}/purchase", response_model=PurchaseResponse)
-def purchase(shopping_list_id: UUID) -> PurchaseResponse:
+def purchase(
+    shopping_list_id: UUID, user: UUID | None = Depends(current_user)
+) -> PurchaseResponse:
     """Mark a shopping list purchased and restock the pantry (spec §3.5)."""
     try:
         with connect() as conn:
+            require_membership(
+                conn, user, household_for_shopping_list(conn, shopping_list_id)
+            )
             result = mark_purchased(conn, shopping_list_id)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
@@ -260,14 +279,23 @@ class CookResponse(BaseModel):
 
 
 @app.post("/v1/meals/{meal_id}/cook", response_model=CookResponse)
-def cook(meal_id: UUID, req: CookRequest | None = None) -> CookResponse:
+def cook(
+    meal_id: UUID,
+    req: CookRequest | None = None,
+    user: UUID | None = Depends(current_user),
+) -> CookResponse:
     """Mark a meal cooked and deplete the pantry per the household mode (spec §3.4)."""
     overrides = req.overrides if req else None
-    try:
-        with connect() as conn:
+    with connect() as conn:
+        try:
+            household_id = household_for_meal(conn, meal_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        require_membership(conn, user, household_id)
+        try:
             result = cook_meal(conn, meal_id, overrides)
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e)) from e
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e)) from e
 
     return CookResponse(
         meal_id=result.meal_id,
