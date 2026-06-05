@@ -115,6 +115,8 @@ export const api = {
       body: JSON.stringify({ meal_plan_id: mealPlanId }),
     }),
   getShoppingList: (id: string) => req<ShoppingListDetail>(`/v1/shopping-lists/${id}`),
+  purchase: (id: string) =>
+    req<unknown>(`/v1/shopping-lists/${id}/purchase`, { method: "POST", body: "{}" }),
   cookMeal: (mealId: string) =>
     req<unknown>(`/v1/meals/${mealId}/cook`, { method: "POST", body: "{}" }),
 };

@@ -30,7 +30,7 @@ from .db import (
 from .generation import GenerationError, generate_meal_plan
 from .pantry import cook_meal
 from .schemas import GeneratedMealPlan, MealPlanRequest
-from .shopping import build_shopping_list
+from .shopping import build_shopping_list, mark_purchased
 
 app = FastAPI(title="Mise AI Service", version="0.0.0")
 
@@ -163,6 +163,34 @@ def build_list(req: ShoppingListRequest) -> ShoppingListResponse:
         items_total=result.items_total,
         items_priced=result.items_priced,
         items_unpriced=result.items_unpriced,
+    )
+
+
+class RestockOut(BaseModel):
+    ingredient_id: UUID
+    unit: str
+    amount: Decimal
+
+
+class PurchaseResponse(BaseModel):
+    shopping_list_id: UUID
+    restocked: list[RestockOut]
+
+
+@app.post("/v1/shopping-lists/{shopping_list_id}/purchase", response_model=PurchaseResponse)
+def purchase(shopping_list_id: UUID) -> PurchaseResponse:
+    """Mark a shopping list purchased and restock the pantry (spec §3.5)."""
+    try:
+        with connect() as conn:
+            result = mark_purchased(conn, shopping_list_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    return PurchaseResponse(
+        shopping_list_id=result.shopping_list_id,
+        restocked=[
+            RestockOut(ingredient_id=r.ingredient_id, unit=r.unit, amount=r.amount)
+            for r in result.restocked
+        ],
     )
 
 

@@ -18,6 +18,19 @@ import psycopg
 
 
 @dataclass
+class Restock:
+    ingredient_id: UUID
+    unit: str
+    amount: Decimal
+
+
+@dataclass
+class PurchaseResult:
+    shopping_list_id: UUID
+    restocked: list[Restock]
+
+
+@dataclass
 class ShoppingListResult:
     shopping_list_id: UUID
     estimated_total: Decimal
@@ -133,3 +146,54 @@ def build_shopping_list(conn: psycopg.Connection, meal_plan_id: UUID) -> Shoppin
         items_total=items_total,
         items_priced=items_priced,
     )
+
+
+def mark_purchased(conn: psycopg.Connection, shopping_list_id: UUID) -> PurchaseResult:
+    """Mark a shopping list purchased and restock the pantry (spec §3.5).
+
+    Each item's `quantity_needed` is added to the household pantry, matched by
+    (ingredient, unit). Idempotent guard: a list can only be purchased once, so
+    the pantry isn't double-restocked.
+    """
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            """
+            select sl.status, mp.household_id
+            from shopping_lists sl
+            join meal_plans mp on mp.id = sl.meal_plan_id
+            where sl.id = %s
+            """,
+            (shopping_list_id,),
+        )
+        head = cur.fetchone()
+        if head is None:
+            raise ValueError(f"shopping_list {shopping_list_id} not found")
+        status, household_id = head
+        if status == "purchased":
+            raise ValueError(f"shopping_list {shopping_list_id} is already purchased")
+
+        cur.execute(
+            "select ingredient_id, quantity_needed, unit from shopping_list_items "
+            "where shopping_list_id = %s",
+            (shopping_list_id,),
+        )
+        restocked: list[Restock] = []
+        for ingredient_id, quantity_needed, unit in cur.fetchall():
+            # Add to the matching pantry row, or create it.
+            cur.execute(
+                """
+                insert into pantry_items (household_id, ingredient_id, quantity, unit)
+                values (%s, %s, %s, %s)
+                on conflict (household_id, ingredient_id, unit)
+                do update set quantity = pantry_items.quantity + excluded.quantity
+                """,
+                (household_id, ingredient_id, quantity_needed, unit),
+            )
+            restocked.append(Restock(ingredient_id, unit, quantity_needed))
+
+        cur.execute(
+            "update shopping_lists set status = 'purchased' where id = %s",
+            (shopping_list_id,),
+        )
+
+    return PurchaseResult(shopping_list_id=shopping_list_id, restocked=restocked)
