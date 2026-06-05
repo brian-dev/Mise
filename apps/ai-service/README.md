@@ -29,8 +29,10 @@ Interactive docs: http://localhost:8000/docs
 
 | Method & path | What it does |
 |---|---|
-| `POST /v1/meal-plans/generate` | Generate a plan via Claude, validate, persist as draft. **Needs `ANTHROPIC_API_KEY`.** |
+| `POST /v1/meal-plans/generate` | Queue generation; returns `202 {job_id}` immediately. Runs Claude + persist in the background. **Needs `ANTHROPIC_API_KEY`.** |
+| `GET /v1/jobs/{job_id}` | Poll job status (`queued`/`running`/`done`/`failed`); on `done`, `result.meal_plan_id` is the draft. |
 | `POST /v1/shopping-lists/build` | Aggregate plan → subtract pantry → price (USDA) → reconcile budget. DB only. |
+| `POST /v1/shopping-lists/{id}/purchase` | Mark purchased; restock the pantry. DB only. |
 | `POST /v1/meals/{meal_id}/cook` | Mark cooked; auto-mode deducts ingredients from the pantry. DB only. |
 
 ## Verify the workflows locally

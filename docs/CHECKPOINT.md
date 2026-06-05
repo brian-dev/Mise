@@ -76,9 +76,16 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      `POST /v1/shopping-lists/{id}/purchase`; web harness has a "Mark purchased" button.
      **Verified against live Postgres** (rolled-back test) and over HTTP. This closes the full
      pantry cycle: shop → purchase (restock) → cook (deplete) → repeat.
-   - TODO next: async job + Realtime wiring (ARCHITECTURE §5, deferred — UI is synchronous for
-     now), recipe swap/iterate + AI pricing fallback (AI_LAYER §9), per-household price
-     calibration, then the token-cost benchmark (AI_LAYER §11) to set the free-tier limit.
+   - ✅ Async generation jobs (branch `feat/async-generation-jobs`): `POST /v1/meal-plans/generate`
+     now returns `202 {job_id}` immediately and runs generation in a FastAPI background task that
+     updates a `generation_jobs` row (queued→running→done/failed); `GET /v1/jobs/{id}` for status.
+     Web harness polls the job and shows queued/running progress instead of a blocking spinner.
+     Migration `0004` makes `generation_jobs.requested_by` nullable (pre-auth). **Verified**: job
+     lifecycle over HTTP (202→running→failed w/o key) and the polling UI in a browser (status +
+     error surfaced). Realtime push (vs polling) is a later enhancement.
+   - TODO next: recipe swap/iterate + AI pricing fallback (AI_LAYER §9), per-household price
+     calibration, parallel/streaming generation for faster multi-day plans, auth + RLS-aware
+     client, then the token-cost benchmark (AI_LAYER §11) to set the free-tier limit.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 
