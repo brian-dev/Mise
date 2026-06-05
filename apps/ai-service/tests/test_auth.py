@@ -14,7 +14,7 @@ from fastapi import HTTPException
 
 from mise_ai.auth import _decode, current_user, is_member, require_membership
 from mise_ai.config import settings
-from mise_ai.db import connect, create_household
+from mise_ai.db import create_household
 
 
 def _token(sub: str, *, aud: str = "authenticated", exp_offset: int = 3600,
@@ -61,21 +61,7 @@ def test_current_user_decodes_bearer() -> None:
     assert current_user(authorization=f"Bearer {_token(uid)}") == UUID(uid)
 
 
-# ---- Membership authorization (live Postgres) ----------------------------- #
-@pytest.fixture
-def conn() -> psycopg.Connection:  # type: ignore[misc]
-    try:
-        c = connect()
-    except Exception as e:  # noqa: BLE001
-        pytest.skip(f"local Postgres not reachable: {e}")
-    c.autocommit = False
-    try:
-        yield c
-    finally:
-        c.rollback()
-        c.close()
-
-
+# ---- Membership authorization (live Postgres; `conn` fixture from conftest) -- #
 def _make_user(cur: psycopg.Cursor, email: str) -> UUID:
     """Insert an auth.users row; the 0003 trigger mirrors it into public.users."""
     uid = uuid.uuid4()

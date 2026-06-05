@@ -46,6 +46,9 @@ strict = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Exclude live (paid, real-Claude) tests by default so `pytest` and CI are fast
+# and free. Run them explicitly with `uv run pytest -m live`.
+addopts = "-m 'not live'"
 markers = [
     "live: hits the real Claude API; requires a non-empty ANTHROPIC_API_KEY",
     "db: requires a reachable Postgres (local Supabase stack)",

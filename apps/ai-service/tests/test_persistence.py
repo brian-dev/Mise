@@ -10,7 +10,7 @@ from __future__ import annotations
 import psycopg
 import pytest
 
-from mise_ai.db import connect, persist_meal_plan
+from mise_ai.db import persist_meal_plan
 from mise_ai.schemas import (
     GeneratedDay,
     GeneratedIngredient,
@@ -23,20 +23,6 @@ from mise_ai.schemas import (
 )
 
 pytestmark = pytest.mark.db
-
-
-@pytest.fixture
-def conn() -> psycopg.Connection:  # type: ignore[misc]
-    try:
-        c = connect()
-    except Exception as e:  # noqa: BLE001
-        pytest.skip(f"local Postgres not reachable: {e}")
-    c.autocommit = False
-    try:
-        yield c
-    finally:
-        c.rollback()  # discard everything this test wrote
-        c.close()
 
 
 def _chili() -> GeneratedRecipe:
