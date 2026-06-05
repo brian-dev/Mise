@@ -35,8 +35,8 @@ clean up after itself. Two acceptable patterns:
 
 **API testing (`apps/ai-service`):** pytest. Pure logic + FastAPI `TestClient` for endpoints;
 integration tests run against the local Supabase stack via the rolled-back `conn` fixture and
-the `db` marker (`uv run pytest -m db`). The `live` marker hits real Claude and is skipped
-without a key.
+the `db` marker (`uv run pytest -m db`). The `live` marker hits **real, paid** Claude and is
+**excluded by default** (`addopts = -m 'not live'`); run it explicitly with `uv run pytest -m live`.
 
 **UI testing (`apps/web`, `apps/mobile`):** standard React conventions — component/unit tests
 with **Vitest + React Testing Library**, end-to-end with **Playwright**. UI/E2E tests must seed
