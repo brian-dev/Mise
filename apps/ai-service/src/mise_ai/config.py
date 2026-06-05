@@ -29,12 +29,16 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     # Supabase auth (ARCHITECTURE §4). Default is the local-stack JWT secret.
-    # require_auth gates enforcement: kept off until the web login UI lands so the
-    # no-login harness keeps working; the JWT/membership mechanism is always built
-    # and tested. Flip to true (and set the real secret) once clients send tokens.
+    # require_auth enforces a verified JWT + household membership on every
+    # household-scoped endpoint (on now that the web client signs in and sends
+    # tokens). Set REQUIRE_AUTH=false for unauthenticated local poking via curl.
+    # Supabase signs user access tokens with an asymmetric key (ES256) published
+    # at the JWKS endpoint; the HS256 shared secret remains valid for legacy
+    # tokens and tests. The verifier (auth.py) handles both.
     supabase_jwt_secret: str = "super-secret-jwt-token-with-at-least-32-characters-long"
+    supabase_jwks_url: str = "http://127.0.0.1:54321/auth/v1/.well-known/jwks.json"
     supabase_jwt_aud: str = "authenticated"
-    require_auth: bool = False
+    require_auth: bool = True
 
     # A full 14-day, all-meal plan with inline recipes can be large; stream above ~16k.
     max_output_tokens: int = 32000

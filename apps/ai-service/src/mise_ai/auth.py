@@ -13,6 +13,7 @@ always verified.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 import jwt
@@ -21,13 +22,33 @@ from fastapi import Header, HTTPException
 
 from .config import settings
 
+# Lazily-built JWKS client for verifying Supabase's asymmetric (ES256) user
+# tokens. PyJWKClient fetches + caches the signing keys from the JWKS endpoint.
+_jwk_client: jwt.PyJWKClient | None = None
+
+
+def _jwks() -> jwt.PyJWKClient:
+    global _jwk_client
+    if _jwk_client is None:
+        _jwk_client = jwt.PyJWKClient(settings.supabase_jwks_url)
+    return _jwk_client
+
 
 def _decode(token: str) -> UUID:
     try:
+        alg = jwt.get_unverified_header(token).get("alg")
+        if alg == "HS256":
+            # Legacy symmetric secret (also used by tests).
+            key: Any = settings.supabase_jwt_secret
+            algorithms = ["HS256"]
+        else:
+            # Supabase user tokens: ES256 (or RS256) verified via JWKS public key.
+            key = _jwks().get_signing_key_from_jwt(token).key
+            algorithms = ["ES256", "RS256"]
         payload = jwt.decode(
             token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
+            key,
+            algorithms=algorithms,
             audience=settings.supabase_jwt_aud,
         )
     except jwt.PyJWTError as e:

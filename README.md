@@ -22,10 +22,15 @@ That single command (`scripts/dev.sh`) does everything:
 4. launches the **AI service** on http://localhost:8000 and the **web client** on
    http://localhost:3000.
 
-Then open **http://localhost:3000** and click through: select/create a household
-→ Generate a plan → Cook meals (pantry depletes) → Build shopping list → Mark
+Then open **http://localhost:3000**, **sign up** (any email + password — the local
+stack auto-confirms, no email step), then click through: create a household →
+Generate a plan → Cook meals (pantry depletes) → Build shopping list → Mark
 purchased (pantry restocks). `Ctrl-C` stops the dev servers (Colima + Supabase
 keep running in the background).
+
+> The API now **requires auth** — every request carries your Supabase session
+> token, and you only see households you belong to. Set `REQUIRE_AUTH=false` to
+> disable enforcement for unauthenticated `curl` poking.
 
 > **Generate** calls Claude, so it needs an API key. Put it in
 > `apps/ai-service/.env` (`cp apps/ai-service/.env.example apps/ai-service/.env`,
