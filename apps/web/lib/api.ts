@@ -50,16 +50,17 @@ export interface MealPlanDetail {
   days: PlanDay[];
 }
 
-export interface GenerateResponse {
-  meal_plan_id: string;
-  plan: GeneratedMealPlan;
-  repair_attempts: number;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_creation_input_tokens: number;
-    cache_read_input_tokens: number;
-  }[];
+export interface JobAccepted {
+  job_id: string;
+  status: string;
+}
+
+export interface JobStatus {
+  id: string;
+  kind: string;
+  status: "queued" | "running" | "done" | "failed";
+  result: { meal_plan_id?: string } | null;
+  error: string | null;
 }
 
 export interface ShoppingSummary {
@@ -104,10 +105,11 @@ export const api = {
     req<Household>("/v1/households", { method: "POST", body: JSON.stringify({ name }) }),
   getPantry: (id: string) => req<PantryItem[]>(`/v1/households/${id}/pantry`),
   generate: (body: GenerateRequest) =>
-    req<GenerateResponse>("/v1/meal-plans/generate", {
+    req<JobAccepted>("/v1/meal-plans/generate", {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  getJob: (id: string) => req<JobStatus>(`/v1/jobs/${id}`),
   getMealPlan: (id: string) => req<MealPlanDetail>(`/v1/meal-plans/${id}`),
   buildShoppingList: (mealPlanId: string) =>
     req<ShoppingSummary>("/v1/shopping-lists/build", {

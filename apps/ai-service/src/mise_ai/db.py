@@ -13,6 +13,7 @@ from typing import Any, cast
 from uuid import UUID
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 from .config import settings
 from .schemas import GeneratedMealPlan, GeneratedRecipe, MealPlanRequest
@@ -92,6 +93,61 @@ def get_meal_plan(conn: psycopg.Connection, meal_plan_id: UUID) -> dict[str, Any
         "end_date": head[2],
         "budget": head[3],
         "days": [{"date": d, "meals": meals} for d, meals in sorted(days.items())],
+    }
+
+
+def create_generation_job(
+    conn: psycopg.Connection,
+    household_id: UUID,
+    kind: str,
+    request: dict[str, Any],
+    requested_by: UUID | None = None,
+) -> UUID:
+    """Create a queued generation job (ARCHITECTURE §5)."""
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into generation_jobs (household_id, requested_by, kind, status, request)
+            values (%s, %s, %s, 'queued', %s)
+            returning id
+            """,
+            (household_id, requested_by, kind, Jsonb(request)),
+        )
+        return cast(UUID, cur.fetchone()[0])  # type: ignore[index]
+
+
+def set_job_status(
+    conn: psycopg.Connection,
+    job_id: UUID,
+    status: str,
+    result: dict[str, Any] | None = None,
+    error: str | None = None,
+) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            "update generation_jobs set status = %s, result = %s, error = %s where id = %s",
+            (status, Jsonb(result) if result is not None else None, error, job_id),
+        )
+
+
+def get_job(conn: psycopg.Connection, job_id: UUID) -> dict[str, Any]:
+    with conn.cursor() as cur:
+        cur.execute(
+            "select id, kind, status, result, error, created_at, updated_at "
+            "from generation_jobs where id = %s",
+            (job_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            raise ValueError(f"job {job_id} not found")
+    return {
+        "id": row[0],
+        "kind": row[1],
+        "status": row[2],
+        "result": row[3],
+        "error": row[4],
+        "created_at": row[5],
+        "updated_at": row[6],
     }
 
 

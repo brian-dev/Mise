@@ -13,23 +13,26 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .config import settings
 from .db import (
     connect,
+    create_generation_job,
     create_household,
+    get_job,
     get_meal_plan,
     get_pantry,
     get_shopping_list,
     list_households,
     persist_meal_plan,
+    set_job_status,
 )
-from .generation import GenerationError, generate_meal_plan
+from .generation import generate_meal_plan
 from .pantry import cook_meal
-from .schemas import GeneratedMealPlan, MealPlanRequest
+from .schemas import MealPlanRequest
 from .shopping import build_shopping_list, mark_purchased
 
 app = FastAPI(title="Mise AI Service", version="0.0.0")
@@ -91,40 +94,74 @@ def shopping_list(shopping_list_id: UUID) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
-class MealPlanUsage(BaseModel):
-    input_tokens: int
-    output_tokens: int
-    cache_creation_input_tokens: int
-    cache_read_input_tokens: int
+class JobAccepted(BaseModel):
+    job_id: UUID
+    status: str
 
 
-class MealPlanResponse(BaseModel):
-    meal_plan_id: UUID
-    plan: GeneratedMealPlan
-    repair_attempts: int
-    usage: list[MealPlanUsage]
+class JobStatus(BaseModel):
+    id: UUID
+    kind: str
+    status: str
+    result: dict[str, Any] | None
+    error: str | None
 
 
-@app.post("/v1/meal-plans/generate", response_model=MealPlanResponse)
-def generate(req: MealPlanRequest) -> MealPlanResponse:
-    """Generate a full meal plan and persist it as a draft (AI_LAYER §2, §5, §7).
+def _run_meal_plan_job(job_id: UUID, req: MealPlanRequest) -> None:
+    """Background worker: generate + persist, updating the job row (ARCHITECTURE §5).
 
-    Synchronous for now; the async job + Realtime wiring (ARCHITECTURE §5) is a
-    follow-up.
+    Catches everything so the job always resolves to done/failed — the client
+    polls the row and must never hang.
     """
     try:
+        with connect() as conn:
+            set_job_status(conn, job_id, "running")
         result = generate_meal_plan(req)
-    except GenerationError as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
+        with connect() as conn:
+            meal_plan_id = persist_meal_plan(conn, result.plan, req)
+            set_job_status(
+                conn,
+                job_id,
+                "done",
+                result={
+                    "meal_plan_id": str(meal_plan_id),
+                    "repair_attempts": result.repair_attempts,
+                    "output_tokens": result.total_output_tokens,
+                },
+            )
+    except Exception as e:  # noqa: BLE001 — surface any failure on the job row
+        with connect() as conn:
+            set_job_status(conn, job_id, "failed", error=str(e))
 
+
+@app.post("/v1/meal-plans/generate", status_code=202, response_model=JobAccepted)
+def generate(req: MealPlanRequest, background: BackgroundTasks) -> JobAccepted:
+    """Queue a meal-plan generation job and return immediately (ARCHITECTURE §5).
+
+    The client polls GET /v1/jobs/{job_id}; on done, result.meal_plan_id points
+    at the persisted draft. (Realtime push is a later enhancement.)
+    """
     with connect() as conn:
-        meal_plan_id = persist_meal_plan(conn, result.plan, req)
+        job_id = create_generation_job(
+            conn, req.household_id, "meal_plan", req.model_dump(mode="json")
+        )
+    background.add_task(_run_meal_plan_job, job_id, req)
+    return JobAccepted(job_id=job_id, status="queued")
 
-    return MealPlanResponse(
-        meal_plan_id=meal_plan_id,
-        plan=result.plan,
-        repair_attempts=result.repair_attempts,
-        usage=[MealPlanUsage(**vars(u)) for u in result.usage],
+
+@app.get("/v1/jobs/{job_id}", response_model=JobStatus)
+def job(job_id: UUID) -> JobStatus:
+    try:
+        with connect() as conn:
+            row = get_job(conn, job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return JobStatus(
+        id=row["id"],
+        kind=row["kind"],
+        status=row["status"],
+        result=row["result"],
+        error=row["error"],
     )
 
 

@@ -38,6 +38,7 @@ export default function Home() {
   const [plan, setPlan] = useState<MealPlanDetail | null>(null);
   const [shopping, setShopping] = useState<ShoppingListDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [genStatus, setGenStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshHouseholds = useCallback(async () => {
@@ -82,7 +83,8 @@ export default function Home() {
   const generate = () =>
     run("generate", async () => {
       setShopping(null);
-      const res = await api.generate({
+      setPlan(null);
+      const { job_id } = await api.generate({
         household_id: householdId,
         start_date: startDate,
         end_date: endDate,
@@ -94,7 +96,25 @@ export default function Home() {
         },
         budget: budget ? Number(budget) : null,
       });
-      setPlan(await api.getMealPlan(res.meal_plan_id));
+
+      // Poll the job until it finishes (Realtime push is a later enhancement).
+      try {
+        for (;;) {
+          const job = await api.getJob(job_id);
+          setGenStatus(job.status);
+          if (job.status === "done") {
+            const id = job.result?.meal_plan_id;
+            if (id) setPlan(await api.getMealPlan(id));
+            return;
+          }
+          if (job.status === "failed") {
+            throw new Error(job.error ?? "generation failed");
+          }
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      } finally {
+        setGenStatus(null);
+      }
     });
 
   const buildList = () =>
@@ -215,8 +235,19 @@ export default function Home() {
           disabled={!householdId || mealTypes.length === 0 || busy === "generate"}
           style={{ marginTop: 12 }}
         >
-          {busy === "generate" ? "Generating… (calls Claude)" : "Generate plan"}
+          {busy === "generate"
+            ? genStatus === "running"
+              ? "Running… (Claude is generating)"
+              : genStatus === "queued"
+                ? "Queued…"
+                : "Starting…"
+            : "Generate plan"}
         </button>
+        {busy === "generate" && (
+          <span style={{ marginLeft: 10, color: "#6b6256" }}>
+            job {genStatus ?? "queued"} — this can take 30–60s for multi-day plans
+          </span>
+        )}
       </section>
 
       {/* Plan */}
