@@ -36,6 +36,15 @@ Name from *mise en place*. Full vision in `docs/PRODUCT_SPEC.md`.
   - `[analytics] enabled = false` — the `vector` container bind-mounts the docker socket, which Colima's vz/virtiofs backend can't do ("operation not supported"). Disabled; not needed locally.
 - Start the stack: `colima start --vm-type vz && cd ~/Documents/github/Mise && supabase start`.
 
+## Testing conventions (rule — see CLAUDE.md → Testing)
+- Project must support **both API and UI testing** with standard tools; **no test leaves DB residue**.
+- API: pytest. Canonical self-cleaning fixture `conn` in `apps/ai-service/tests/conftest.py`
+  (rolled-back transaction); DB tests use the `db` marker; `live` marker for real Claude.
+- UI: Vitest + React Testing Library (component) and Playwright (E2E) — seed + tear down own data.
+- Manual/exploratory writes (curl, `scripts/seed_demo.py`, UI clicks) commit real rows — clean with
+  **`pnpm db:reset`** (`scripts/db-reset.sh` → `supabase db reset`). Verified: full `turbo run test`
+  leaves the dev DB at 0 households / 42 seeded ingredients (no pollution).
+
 ## Tech stack (decided)
 Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supabase (Postgres/Auth/Storage/RLS) · FastAPI + Claude API (AI service) · USDA price data · Open Food Facts (barcode). Monorepo: pnpm + Turborepo.
 

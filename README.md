@@ -60,6 +60,19 @@ Mark purchased.
 - Supabase stack: `supabase stop` (from the repo root).
 - Container runtime: `colima stop`.
 
+### Keep the dev database clean
+
+Automated tests roll back their writes and never leave residue. **Manual/exploratory
+testing** (curl, `scripts/seed_demo.py`, clicking through the UI) commits real rows — reset
+to a pristine seeded state when you're done:
+
+```sh
+pnpm db:reset      # drops all data, re-applies migrations + seed
+```
+
+See [`CLAUDE.md`](CLAUDE.md) → Testing for the full convention (API tests with pytest +
+rolled-back fixtures; UI tests with Vitest/RTL + Playwright; nothing leaves the DB dirty).
+
 ## Inspect the database
 
 - Supabase Studio: http://localhost:54323
