@@ -109,10 +109,19 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      endpoint is now membership-checked — safe to flip enforcement on in step 2.
      Also: live Claude generation test now **passes against real Claude** (key in `.env`); `live`
      marker is excluded from the default `pytest` run (paid).
-   - TODO next: auth part (b) step 2 — web Supabase login (sign in/up) + attach JWT to API calls +
-     create-household-on-first-login, then set `require_auth` on by default. Then recipe
-     swap/iterate + AI pricing fallback (AI_LAYER §9), price calibration, parallel/streaming
-     generation, and the token-cost benchmark (AI_LAYER §11).
+   - ✅ Auth — part (b) step 2: web login + enforcement ON (branch `feat/auth-web-login`).
+     `apps/web` now uses `@supabase/supabase-js`: email/password sign in+up (`app/auth.tsx`),
+     the page is gated behind a session, and `lib/api.ts` attaches the Supabase access token to
+     every request. `require_auth` now defaults **true**. Key fix: Supabase signs user tokens
+     with **ES256 via JWKS** (not the HS256 shared secret), so `auth.py` verifies both —
+     HS256 (legacy/tests) and ES256/RS256 (real user tokens, `PyJWKClient` against the JWKS
+     endpoint; needs `pyjwt[crypto]`). **Verified in a real browser**: sign-up → session →
+     authed API calls → created a household with owner membership → membership-authorized
+     pantry read (all 200s); unauthenticated request → 401.
+   - TODO next: recipe swap/iterate + AI pricing fallback (AI_LAYER §9), per-household price
+     calibration, parallel/streaming generation, Supabase Realtime (replace job polling),
+     and the token-cost benchmark (AI_LAYER §11). Note: `seed_demo.py` makes ownerless
+     households now invisible in the auth'd UI — it's an API/DB-level tool only.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

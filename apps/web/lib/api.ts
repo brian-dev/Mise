@@ -1,15 +1,21 @@
 // Thin client for the Mise AI service (local dev harness).
 // Base URL overridable via NEXT_PUBLIC_API_URL.
 
-import type { GeneratedMealPlan, MealType } from "@mise/shared";
+import type { MealType } from "@mise/shared";
+
+import { supabase } from "./supabase";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
-  });
+  // Attach the Supabase access token so the AI service can authorize the caller.
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API}${path}`, { ...init, headers });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`${res.status} ${res.statusText}: ${body}`);

@@ -50,10 +50,12 @@ def test_expired_token_rejected() -> None:
     assert ei.value.status_code == 401
 
 
-def test_current_user_anonymous_when_auth_disabled() -> None:
-    # require_auth defaults to False -> no header means anonymous (None).
-    assert settings.require_auth is False
-    assert current_user(authorization=None) is None
+def test_current_user_requires_token_when_enforced() -> None:
+    # require_auth defaults to True -> a missing token is rejected with 401.
+    assert settings.require_auth is True
+    with pytest.raises(HTTPException) as ei:
+        current_user(authorization=None)
+    assert ei.value.status_code == 401
 
 
 def test_current_user_decodes_bearer() -> None:

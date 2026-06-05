@@ -11,6 +11,7 @@ import {
   type PantryItem,
   type ShoppingListDetail,
 } from "../lib/api";
+import { Login, SignOutButton, useSession } from "./auth";
 
 const card: React.CSSProperties = {
   border: "1px solid #e2ddd2",
@@ -20,7 +21,14 @@ const card: React.CSSProperties = {
   background: "#fff",
 };
 
-export default function Home() {
+export default function Page() {
+  const session = useSession();
+  if (session === undefined) return null; // loading
+  if (session === null) return <Login />;
+  return <Home email={session.user.email} />;
+}
+
+function Home({ email }: { email?: string }) {
   const [households, setHouseholds] = useState<Household[]>([]);
   const [householdId, setHouseholdId] = useState<string>("");
   const [newName, setNewName] = useState("");
@@ -141,6 +149,7 @@ export default function Home() {
 
   return (
     <main style={{ fontFamily: "system-ui", maxWidth: 760, margin: "0 auto", padding: "2rem 1rem" }}>
+      <SignOutButton email={email} />
       <h1 style={{ marginBottom: 4 }}>Mise — dev harness</h1>
       <p style={{ color: "#6b6256", marginTop: 0 }}>Verify the core loop end-to-end.</p>
 
