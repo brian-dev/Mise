@@ -70,9 +70,15 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      real browser**: page renders, browser→API fetch works (CORS), households + pantry load and
      reflect depletion. Generate path is wired identically but needs a real key to exercise.
      Dev harness only — not the auth'd production client.
-   - TODO next: async job + Realtime wiring (ARCHITECTURE §5), recipe swap/iterate + AI pricing
-     fallback (AI_LAYER §9), shopping-list "purchased" → pantry restock (spec §3.4/§3.5), then
-     the token-cost benchmark (AI_LAYER §11) to set the free-tier limit.
+   - ✅ Purchase → pantry restock (`shopping.py` `mark_purchased`, branch
+     `feat/shopping-purchase-restock`): marking a list purchased adds each item's quantity to the
+     pantry (upsert by ingredient+unit) and sets status `purchased`; double-purchase guarded.
+     `POST /v1/shopping-lists/{id}/purchase`; web harness has a "Mark purchased" button.
+     **Verified against live Postgres** (rolled-back test) and over HTTP. This closes the full
+     pantry cycle: shop → purchase (restock) → cook (deplete) → repeat.
+   - TODO next: async job + Realtime wiring (ARCHITECTURE §5, deferred — UI is synchronous for
+     now), recipe swap/iterate + AI pricing fallback (AI_LAYER §9), per-household price
+     calibration, then the token-cost benchmark (AI_LAYER §11) to set the free-tier limit.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

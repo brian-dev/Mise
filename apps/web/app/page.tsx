@@ -111,6 +111,14 @@ export default function Home() {
       await refreshPantry(householdId);
     });
 
+  const markPurchased = () =>
+    run("purchase", async () => {
+      if (!shopping) return;
+      await api.purchase(shopping.shopping_list_id);
+      setShopping(await api.getShoppingList(shopping.shopping_list_id));
+      await refreshPantry(householdId);
+    });
+
   return (
     <main style={{ fontFamily: "system-ui", maxWidth: 760, margin: "0 auto", padding: "2rem 1rem" }}>
       <h1 style={{ marginBottom: 4 }}>Mise — dev harness</h1>
@@ -241,10 +249,15 @@ export default function Home() {
       {/* Shopping list */}
       {shopping && (
         <section style={card}>
-          <h2>4 · Shopping list</h2>
+          <h2>4 · Shopping list ({shopping.status})</h2>
           <div>
             Estimated total: <strong>${shopping.estimated_total}</strong>
           </div>
+          {shopping.status !== "purchased" && (
+            <button onClick={markPurchased} disabled={busy === "purchase"} style={{ marginTop: 8 }}>
+              Mark purchased (restock pantry)
+            </button>
+          )}
           <table style={{ marginTop: 8, borderCollapse: "collapse", width: "100%" }}>
             <thead>
               <tr style={{ textAlign: "left", borderBottom: "1px solid #e2ddd2" }}>
