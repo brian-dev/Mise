@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "./scripts/dev.sh",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
