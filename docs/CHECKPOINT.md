@@ -118,10 +118,18 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      endpoint; needs `pyjwt[crypto]`). **Verified in a real browser**: sign-up → session →
      authed API calls → created a household with owner membership → membership-authorized
      pantry read (all 200s); unauthenticated request → 401.
-   - TODO next: recipe swap/iterate + AI pricing fallback (AI_LAYER §9), per-household price
-     calibration, parallel/streaming generation, Supabase Realtime (replace job polling),
-     and the token-cost benchmark (AI_LAYER §11). Note: `seed_demo.py` makes ownerless
-     households now invisible in the auth'd UI — it's an API/DB-level tool only.
+   - ✅ Recipe swap (branch `feat/recipe-swap`, AI_LAYER §8): `POST /v1/meals/{id}/swap`
+     regenerates one meal's recipe (Haiku via `emit_recipe` tool), constrained by dietary +
+     pantry + the other plan titles (variety), persists the new recipe (shared pool,
+     canonicalized) and points the meal at it. Web has a per-meal **Swap** button.
+     **Verified**: live recipe generation against real Claude (`generate_recipe`), and a db test
+     for `meal_swap_context` + `swap_meal_recipe` (rolled back). Also **fixed a test-infra bug**:
+     the `conn` fixture now primes the outer transaction so `conn.transaction()` blocks become
+     savepoints (a test leading with `create_household` was committing/leaking; now CLEAN).
+   - TODO next: AI pricing fallback (AI_LAYER §9), per-household price calibration,
+     parallel/streaming generation, Supabase Realtime (replace job polling), recipe *iterate*
+     endpoint, and the token-cost benchmark (AI_LAYER §11). Note: `seed_demo.py` makes ownerless
+     households invisible in the auth'd UI — it's an API/DB-level tool only.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

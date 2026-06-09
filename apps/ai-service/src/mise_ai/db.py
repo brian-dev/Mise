@@ -99,6 +99,55 @@ def household_for_meal(conn: psycopg.Connection, meal_id: UUID) -> UUID:
     return cast(UUID, row[0])
 
 
+def meal_swap_context(conn: psycopg.Connection, meal_id: UUID) -> dict[str, Any]:
+    """Gather what a recipe swap needs: meal type/servings, the household, and the
+    other recipe titles in the same plan (for variety)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select m.meal_type, m.servings, mp.household_id, mp.id
+            from meals m
+            join meal_plan_days d on d.id = m.meal_plan_day_id
+            join meal_plans mp on mp.id = d.meal_plan_id
+            where m.id = %s
+            """,
+            (meal_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            raise ValueError(f"meal {meal_id} not found")
+        meal_type, servings, household_id, meal_plan_id = row
+
+        cur.execute(
+            """
+            select distinct r.title
+            from meals m
+            join meal_plan_days d on d.id = m.meal_plan_day_id
+            join recipes r on r.id = m.recipe_id
+            where d.meal_plan_id = %s and m.id <> %s
+            """,
+            (meal_plan_id, meal_id),
+        )
+        avoid_titles = [r[0] for r in cur.fetchall()]
+    return {
+        "meal_type": meal_type,
+        "servings": servings,
+        "household_id": household_id,
+        "avoid_titles": avoid_titles,
+    }
+
+
+def swap_meal_recipe(
+    conn: psycopg.Connection, meal_id: UUID, recipe: GeneratedRecipe
+) -> UUID:
+    """Persist a new recipe (shared pool, canonicalized ingredients) and point the
+    meal at it. Returns the new recipe id."""
+    with conn.transaction(), conn.cursor() as cur:
+        recipe_id = _persist_recipe(cur, recipe)
+        cur.execute("update meals set recipe_id = %s where id = %s", (recipe_id, meal_id))
+    return recipe_id
+
+
 def get_pantry(conn: psycopg.Connection, household_id: UUID) -> list[dict[str, Any]]:
     with conn.cursor() as cur:
         cur.execute(

@@ -24,6 +24,12 @@ def conn() -> Iterator[psycopg.Connection]:
     except Exception as e:  # noqa: BLE001
         pytest.skip(f"local Postgres not reachable: {e}")
     c.autocommit = False
+    # Open the outer transaction up front so any `conn.transaction()` inside the
+    # code under test becomes a SAVEPOINT, not a top-level transaction that would
+    # commit. Without this, a test whose first DB op is a `conn.transaction()`
+    # block (e.g. create_household) would commit and leak rows past rollback.
+    with c.cursor() as cur:
+        cur.execute("select 1")
     try:
         yield c
     finally:
