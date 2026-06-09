@@ -31,12 +31,14 @@ from .db import (
     household_for_meal_plan,
     household_for_shopping_list,
     list_households,
+    meal_swap_context,
     persist_meal_plan,
     set_job_status,
+    swap_meal_recipe,
 )
-from .generation import generate_meal_plan
+from .generation import GenerationError, generate_meal_plan, generate_recipe
 from .pantry import cook_meal
-from .schemas import MealPlanRequest
+from .schemas import Dietary, MealPlanRequest, PantryItem, RecipeRequest, Unit
 from .shopping import build_shopping_list, mark_purchased
 
 app = FastAPI(title="Mise AI Service", version="0.0.0")
@@ -304,4 +306,59 @@ def cook(
             DeductionOut(ingredient_id=d.ingredient_id, unit=d.unit, amount=d.amount)
             for d in result.deductions
         ],
+    )
+
+
+class SwapRequest(BaseModel):
+    dietary: Dietary | None = None
+    modify: str | None = None  # e.g. "spicier", "make it vegan"
+
+
+class SwapResponse(BaseModel):
+    meal_id: UUID
+    recipe_id: UUID
+    title: str
+    cuisine_tags: list[str]
+
+
+@app.post("/v1/meals/{meal_id}/swap", response_model=SwapResponse)
+def swap(
+    meal_id: UUID,
+    req: SwapRequest | None = None,
+    user: UUID | None = Depends(current_user),
+) -> SwapResponse:
+    """Regenerate the recipe for one meal slot and point the meal at it (AI_LAYER §8).
+
+    Synchronous (single recipe, ~seconds). Constrained by dietary + pantry + the
+    other meals in the plan for variety.
+    """
+    with connect() as conn:
+        try:
+            ctx = meal_swap_context(conn, meal_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        require_membership(conn, user, ctx["household_id"])
+        pantry = [
+            PantryItem(name=p["name"], quantity=float(p["quantity"]), unit=Unit(p["unit"]))
+            for p in get_pantry(conn, ctx["household_id"])
+        ]
+        recipe_req = RecipeRequest(
+            meal_type=ctx["meal_type"],
+            servings=ctx["servings"],
+            dietary=(req.dietary if req and req.dietary else Dietary()),
+            pantry=pantry,
+            avoid_titles=ctx["avoid_titles"],
+            modify=(req.modify if req else None),
+        )
+        try:
+            result = generate_recipe(recipe_req)
+        except GenerationError as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
+        recipe_id = swap_meal_recipe(conn, meal_id, result.recipe)
+
+    return SwapResponse(
+        meal_id=meal_id,
+        recipe_id=recipe_id,
+        title=result.recipe.title,
+        cuisine_tags=result.recipe.cuisine_tags,
     )

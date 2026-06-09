@@ -39,6 +39,38 @@ naturally portioned differently.
 - Keep recipes realistic: sensible prep/cook times and complete instructions.\
 """
 
+# Recipe object schema — mirrors schemas.GeneratedRecipe (AI_LAYER §4). Shared by
+# the meal-plan tool ($defs.recipe) and the single-recipe swap/iterate tool.
+_RECIPE_OBJECT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["title", "cuisine_tags", "default_servings", "instructions", "ingredients"],
+    "properties": {
+        "title": {"type": "string"},
+        "description": {"type": "string"},
+        "cuisine_tags": {"type": "array", "items": {"type": "string"}},
+        "prep_time": {"type": "integer", "minimum": 0},
+        "cook_time": {"type": "integer", "minimum": 0},
+        "default_servings": {"type": "integer", "minimum": 1},
+        "instructions": {"type": "string"},
+        "ingredients": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["name", "quantity", "unit"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "category": {"type": "string"},
+                    "quantity": {"type": "number", "exclusiveMinimum": 0},
+                    "unit": {"type": "string", "enum": _UNITS},
+                    "is_optional": {"type": "boolean"},
+                },
+            },
+        },
+    },
+}
+
 # JSON Schema for the tool. Mirrors schemas.GeneratedMealPlan (AI_LAYER §4).
 MEAL_PLAN_TOOL: dict[str, Any] = {
     "name": "emit_meal_plan",
@@ -76,42 +108,31 @@ MEAL_PLAN_TOOL: dict[str, Any] = {
                 },
             },
         },
-        "$defs": {
-            "recipe": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": [
-                    "title",
-                    "cuisine_tags",
-                    "default_servings",
-                    "instructions",
-                    "ingredients",
-                ],
-                "properties": {
-                    "title": {"type": "string"},
-                    "description": {"type": "string"},
-                    "cuisine_tags": {"type": "array", "items": {"type": "string"}},
-                    "prep_time": {"type": "integer", "minimum": 0},
-                    "cook_time": {"type": "integer", "minimum": 0},
-                    "default_servings": {"type": "integer", "minimum": 1},
-                    "instructions": {"type": "string"},
-                    "ingredients": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": ["name", "quantity", "unit"],
-                            "properties": {
-                                "name": {"type": "string"},
-                                "category": {"type": "string"},
-                                "quantity": {"type": "number", "exclusiveMinimum": 0},
-                                "unit": {"type": "string", "enum": _UNITS},
-                                "is_optional": {"type": "boolean"},
-                            },
-                        },
-                    },
-                },
-            },
-        },
+        "$defs": {"recipe": _RECIPE_OBJECT_SCHEMA},
     },
 }
+
+
+# Single-recipe tool for meal swaps / iteration (AI_LAYER §8). Same recipe shape.
+EMIT_RECIPE_TOOL: dict[str, Any] = {
+    "name": "emit_recipe",
+    "description": "Emit a single recipe for one meal slot.",
+    "input_schema": _RECIPE_OBJECT_SCHEMA,
+}
+
+RECIPE_SYSTEM_PROMPT = """\
+You are Mise's recipe engine. You generate a single, practical recipe for one \
+meal slot that a home cook can shop for and make.
+
+Hard rules:
+- Emit the recipe ONLY by calling the `emit_recipe` tool. No prose.
+- Treat dietary `flags` as HARD constraints (never violate). Treat `avoid_text` \
+as a strong soft preference.
+- Prefer ingredients already in the provided pantry before introducing new ones.
+- Make it DIFFERENT from the listed `avoid_titles` (the other meals this week).
+- If `modify` is given, honor it (e.g. "spicier", "make it vegan", "use what I \
+have") relative to the provided base recipe.
+- Quantities must use ONLY this unit vocabulary: """ + ", ".join(_UNITS) + """.
+- Use plain, canonical ingredient names; quantity + unit carry the amount.
+- Scale `default_servings` to the requested servings.\
+"""

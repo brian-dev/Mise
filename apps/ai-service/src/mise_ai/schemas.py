@@ -64,6 +64,17 @@ class Dietary(BaseModel):
     avoid_text: str | None = None
 
 
+class RecipeRequest(BaseModel):
+    """Context for a single-recipe swap/iteration (AI_LAYER §8)."""
+
+    meal_type: MealType
+    servings: int = Field(ge=1)
+    dietary: Dietary = Field(default_factory=lambda: Dietary())
+    pantry: list[PantryItem] = Field(default_factory=list)
+    avoid_titles: list[str] = Field(default_factory=list)  # other meals in the plan
+    modify: str | None = None  # e.g. "spicier", "make it vegan"
+
+
 class MealPlanRequest(BaseModel):
     household_id: UUID
     start_date: date

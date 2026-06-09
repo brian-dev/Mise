@@ -127,4 +127,9 @@ export const api = {
     req<unknown>(`/v1/shopping-lists/${id}/purchase`, { method: "POST", body: "{}" }),
   cookMeal: (mealId: string) =>
     req<unknown>(`/v1/meals/${mealId}/cook`, { method: "POST", body: "{}" }),
+  swapMeal: (mealId: string, modify?: string) =>
+    req<{ title: string }>(`/v1/meals/${mealId}/swap`, {
+      method: "POST",
+      body: JSON.stringify({ modify: modify ?? null }),
+    }),
 };

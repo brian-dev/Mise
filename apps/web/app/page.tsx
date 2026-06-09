@@ -139,6 +139,12 @@ function Home({ email }: { email?: string }) {
       await refreshPantry(householdId);
     });
 
+  const swap = (mealId: string) =>
+    run(`swap-${mealId}`, async () => {
+      await api.swapMeal(mealId);
+      if (plan) setPlan(await api.getMealPlan(plan.meal_plan_id));
+    });
+
   const markPurchased = () =>
     run("purchase", async () => {
       if (!shopping) return;
@@ -272,9 +278,14 @@ function Home({ email }: { email?: string }) {
                   {m.cooked_at ? (
                     <span style={{ color: "#2e7d32" }}>✓ cooked</span>
                   ) : (
-                    <button onClick={() => cook(m.meal_id)} disabled={busy === `cook-${m.meal_id}`}>
-                      Cook
-                    </button>
+                    <>
+                      <button onClick={() => cook(m.meal_id)} disabled={!!busy}>
+                        Cook
+                      </button>{" "}
+                      <button onClick={() => swap(m.meal_id)} disabled={!!busy}>
+                        {busy === `swap-${m.meal_id}` ? "Swapping…" : "Swap"}
+                      </button>
+                    </>
                   )}
                 </div>
               ))}

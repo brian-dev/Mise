@@ -18,9 +18,9 @@ from pydantic import ValidationError
 
 from .anthropic_client import Usage, call_tool
 from .config import settings
-from .prompts import build_context_block
-from .schemas import GeneratedMealPlan, MealPlanRequest
-from .tools import MEAL_PLAN_TOOL, SYSTEM_PROMPT
+from .prompts import build_context_block, build_recipe_context
+from .schemas import GeneratedMealPlan, GeneratedRecipe, MealPlanRequest, RecipeRequest
+from .tools import EMIT_RECIPE_TOOL, MEAL_PLAN_TOOL, RECIPE_SYSTEM_PROMPT, SYSTEM_PROMPT
 
 
 class GenerationError(Exception):
@@ -146,3 +146,61 @@ def generate_meal_plan(req: MealPlanRequest) -> MealPlanResult:
         )
 
     raise GenerationError("Unreachable: repair loop exited without returning.")
+
+
+@dataclass
+class RecipeResult:
+    recipe: GeneratedRecipe
+    usage: list[Usage]
+    repair_attempts: int
+
+
+def generate_recipe(
+    req: RecipeRequest, base_recipe: dict[str, Any] | None = None
+) -> RecipeResult:
+    """Generate one recipe for a meal swap/iteration (AI_LAYER §8).
+
+    Uses the cheaper recipe model (Haiku). Same bounded-repair discipline as the
+    full plan, but the only semantic check is schema validity.
+    """
+    messages: list[dict[str, Any]] = [
+        {"role": "user", "content": build_recipe_context(req, base_recipe)}
+    ]
+    usages: list[Usage] = []
+
+    for attempt in range(settings.max_repair_attempts + 1):
+        result = call_tool(
+            model=settings.recipe_model,
+            system_prompt=RECIPE_SYSTEM_PROMPT,
+            tool=EMIT_RECIPE_TOOL,
+            messages=messages,
+        )
+        usages.append(result.usage)
+        try:
+            recipe = GeneratedRecipe.model_validate(result.tool_input)
+        except ValidationError as e:
+            if attempt >= settings.max_repair_attempts:
+                raise GenerationError(f"Recipe failed validation: {e}") from e
+            tool_use_id = None
+            for b in result.raw_content:
+                if b.type == "tool_use":
+                    tool_use_id = b.id
+                    break
+            messages.append({"role": "assistant", "content": result.raw_content})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "is_error": True,
+                            "content": f"The recipe was invalid. Fix and re-emit:\n{e}",
+                        }
+                    ],
+                }
+            )
+            continue
+        return RecipeResult(recipe=recipe, usage=usages, repair_attempts=attempt)
+
+    raise GenerationError("Unreachable: recipe repair loop exited without returning.")
