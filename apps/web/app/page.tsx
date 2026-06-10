@@ -152,6 +152,13 @@ function Home({ email }: { email?: string }) {
       if (plan) setPlan(await api.getMealPlan(plan.meal_plan_id));
     });
 
+  const estimatePrices = () =>
+    run("estimate", async () => {
+      if (!shopping) return;
+      await api.estimatePrices(shopping.shopping_list_id);
+      setShopping(await api.getShoppingList(shopping.shopping_list_id));
+    });
+
   const markPurchased = () =>
     run("purchase", async () => {
       if (!shopping) return;
@@ -324,11 +331,26 @@ function Home({ email }: { email?: string }) {
           <h2>4 · Shopping list ({shopping.status})</h2>
           <div>
             Estimated total: <strong data-testid="estimated-total">${shopping.estimated_total}</strong>
+            {shopping.items.some((it) => it.estimated_price === null) && (
+              <em style={{ color: "#6b6256" }}> (some items not yet priced)</em>
+            )}
           </div>
           {shopping.status !== "purchased" && (
-            <button onClick={markPurchased} disabled={busy === "purchase"} style={{ marginTop: 8 }}>
-              Mark purchased (restock pantry)
-            </button>
+            <div style={{ marginTop: 8 }}>
+              {shopping.items.some((it) => it.estimated_price === null) && (
+                <button
+                  data-testid="estimate-prices"
+                  onClick={estimatePrices}
+                  disabled={busy === "estimate"}
+                  style={{ marginRight: 8 }}
+                >
+                  {busy === "estimate" ? "Estimating…" : "Estimate remaining prices (AI)"}
+                </button>
+              )}
+              <button data-testid="purchase" onClick={markPurchased} disabled={busy === "purchase"}>
+                Mark purchased (restock pantry)
+              </button>
+            </div>
           )}
           <table style={{ marginTop: 8, borderCollapse: "collapse", width: "100%" }}>
             <thead>

@@ -39,8 +39,15 @@ from .db import (
 )
 from .generation import GenerationError, generate_meal_plan, generate_recipe
 from .pantry import cook_meal
+from .pricing import PricingError, PricingItem, estimate_prices
 from .schemas import Dietary, MealPlanRequest, PantryItem, RecipeRequest, Unit
-from .shopping import build_shopping_list, mark_purchased
+from .shopping import (
+    apply_estimated_prices,
+    build_shopping_list,
+    get_unpriced_items,
+    mark_purchased,
+    shopping_list_region_store,
+)
 
 app = FastAPI(title="Mise AI Service", version="0.0.0")
 
@@ -248,6 +255,65 @@ def build_list(
         items_total=result.items_total,
         items_priced=result.items_priced,
         items_unpriced=result.items_unpriced,
+    )
+
+
+class EstimatePricesResponse(BaseModel):
+    shopping_list_id: UUID
+    estimated_total: Decimal
+    items_estimated: int
+
+
+@app.post(
+    "/v1/shopping-lists/{shopping_list_id}/estimate-prices",
+    response_model=EstimatePricesResponse,
+)
+def estimate_list_prices(
+    shopping_list_id: UUID, user: UUID | None = Depends(current_user)
+) -> EstimatePricesResponse:
+    """Fill in prices for items the USDA path couldn't price, via the AI fallback
+    (AI_LAYER §9). Idempotent-ish: only touches items still missing a price."""
+    with connect() as conn:
+        try:
+            require_membership(
+                conn, user, household_for_shopping_list(conn, shopping_list_id)
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        items = get_unpriced_items(conn, shopping_list_id)
+        region, store = shopping_list_region_store(conn, shopping_list_id)
+
+    if not items:
+        with connect() as conn:
+            current = get_shopping_list(conn, shopping_list_id)
+        return EstimatePricesResponse(
+            shopping_list_id=shopping_list_id,
+            estimated_total=Decimal(str(current["estimated_total"])),
+            items_estimated=0,
+        )
+
+    pricing_items = [
+        PricingItem(
+            name=str(it["name"]),
+            quantity=Decimal(str(it["quantity_needed"])),
+            unit=str(it["unit"]),
+        )
+        for it in items
+    ]
+    try:
+        result = estimate_prices(pricing_items, region=region, store=store)
+    except PricingError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    priced = [
+        (UUID(str(it["id"])), price) for it, price in zip(items, result.prices, strict=True)
+    ]
+    with connect() as conn:
+        total = apply_estimated_prices(conn, shopping_list_id, priced)
+    return EstimatePricesResponse(
+        shopping_list_id=shopping_list_id,
+        estimated_total=total,
+        items_estimated=len(priced),
     )
 
 

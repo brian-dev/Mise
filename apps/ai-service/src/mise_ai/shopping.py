@@ -155,6 +155,69 @@ def build_shopping_list(conn: psycopg.Connection, meal_plan_id: UUID) -> Shoppin
     )
 
 
+def get_unpriced_items(
+    conn: psycopg.Connection, shopping_list_id: UUID
+) -> list[dict[str, object]]:
+    """Items on the list with no estimated price yet (for the AI fallback)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select s.id, i.name, s.quantity_needed, s.unit
+            from shopping_list_items s join ingredients i on i.id = s.ingredient_id
+            where s.shopping_list_id = %s and s.estimated_price is null
+            order by i.name
+            """,
+            (shopping_list_id,),
+        )
+        return [
+            {"id": r[0], "name": r[1], "quantity_needed": r[2], "unit": r[3]}
+            for r in cur.fetchall()
+        ]
+
+
+def shopping_list_region_store(
+    conn: psycopg.Connection, shopping_list_id: UUID
+) -> tuple[str | None, str | None]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select h.region, h.store_preference
+            from shopping_lists sl
+            join meal_plans mp on mp.id = sl.meal_plan_id
+            join households h on h.id = mp.household_id
+            where sl.id = %s
+            """,
+            (shopping_list_id,),
+        )
+        row = cur.fetchone()
+    return (row[0], row[1]) if row is not None else (None, None)
+
+
+def apply_estimated_prices(
+    conn: psycopg.Connection,
+    shopping_list_id: UUID,
+    priced: list[tuple[UUID, Decimal]],
+) -> Decimal:
+    """Write AI estimates onto items, recompute and store the list total, return it."""
+    with conn.transaction(), conn.cursor() as cur:
+        for item_id, price in priced:
+            cur.execute(
+                "update shopping_list_items set estimated_price = %s where id = %s",
+                (price, item_id),
+            )
+        cur.execute(
+            "select coalesce(sum(estimated_price), 0) from shopping_list_items "
+            "where shopping_list_id = %s",
+            (shopping_list_id,),
+        )
+        total: Decimal = cur.fetchone()[0]  # type: ignore[index]
+        cur.execute(
+            "update shopping_lists set estimated_total = %s where id = %s",
+            (total, shopping_list_id),
+        )
+    return total
+
+
 def mark_purchased(conn: psycopg.Connection, shopping_list_id: UUID) -> PurchaseResult:
     """Mark a shopping list purchased and restock the pantry (spec §3.5).
 
