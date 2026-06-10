@@ -6,10 +6,20 @@ loop with a stubbed Anthropic call.
 
 from __future__ import annotations
 
+import pytest
+
 import mise_ai.generation as gen
 from mise_ai.anthropic_client import ToolCallResult, Usage
-from mise_ai.generation import GenerationError, generate_meal_plan
-from mise_ai.schemas import MealPlanRequest
+from mise_ai.config import settings
+from mise_ai.generation import GenerationError, MealPlanResult, generate_meal_plan
+from mise_ai.schemas import GeneratedMealPlan, MealPlanRequest
+
+
+@pytest.fixture(autouse=True)
+def _one_shot(monkeypatch) -> None:
+    # These exercise the one-shot path's validation/repair; pin parallel off so a
+    # multi-day request doesn't fan out into per-day calls.
+    monkeypatch.setattr(settings, "parallel_generation", False)
 
 
 def _req(**over: object) -> MealPlanRequest:
@@ -105,3 +115,18 @@ def test_missing_meal_type_is_semantic_error(monkeypatch) -> None:
         assert "missing meal types" in str(e)
     else:  # pragma: no cover
         raise AssertionError("expected GenerationError")
+
+
+def test_parallel_merges_days_in_order(monkeypatch) -> None:
+    """With parallel on, each day is generated independently and merged in order."""
+    monkeypatch.setattr(settings, "parallel_generation", True)
+
+    def fake_one_shot(req: MealPlanRequest) -> MealPlanResult:
+        # Return a one-day plan for whatever single day was requested.
+        plan = GeneratedMealPlan.model_validate(_plan([req.start_date.isoformat()]))
+        return MealPlanResult(plan=plan, usage=[_usage()], repair_attempts=0)
+
+    monkeypatch.setattr(gen, "_generate_one_shot", fake_one_shot)
+    result = generate_meal_plan(_req())  # 2-day request -> 2 concurrent calls
+    assert [d.date.isoformat() for d in result.plan.days] == ["2026-06-10", "2026-06-11"]
+    assert len(result.usage) == 2  # one usage entry per day

@@ -29,6 +29,7 @@ as a strong soft preference.
 - Prefer ingredients already in the provided pantry before introducing new ones \
 ("use what you have first").
 - Honor the variety target across the week.
+- If a `cuisine_hint` is given, center the day's meals on that cuisine.
 - Quantities must use ONLY this unit vocabulary: \
 """ + ", ".join(_UNITS) + """.
 - Use plain, canonical ingredient names (e.g. "yellow onion", not \

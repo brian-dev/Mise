@@ -87,6 +87,10 @@ class MealPlanRequest(BaseModel):
     region: str | None = None
     store_preference: str | None = None
     variety_target: str | None = "Avoid repeating the same cuisine two days in a row."
+    # Optional per-request cuisine focus. Used by parallel generation to keep days
+    # distinct (each concurrent day gets a different hint) since they can't see
+    # each other's output.
+    cuisine_hint: str | None = None
 
 
 # --------------------------------------------------------------------------- #

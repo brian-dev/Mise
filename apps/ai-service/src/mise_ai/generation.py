@@ -10,8 +10,9 @@ token-cost benchmark (AI_LAYER §11).
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from pydantic import ValidationError
@@ -90,10 +91,68 @@ def _validate(
     return plan, []
 
 
+# Cuisine rotation to keep concurrently-generated days distinct (they can't see
+# each other's output). Broad enough to work across dietary constraints.
+_CUISINES = ["Italian", "Mexican", "Indian", "Thai", "Mediterranean", "Japanese", "American"]
+
+
+def _single_day_request(
+    req: MealPlanRequest, day: date, cuisine_hint: str | None = None
+) -> MealPlanRequest:
+    """A copy of the request scoped to one day (for parallel generation)."""
+    update: dict[str, Any] = {"start_date": day, "end_date": day}
+    if cuisine_hint is not None:
+        update["cuisine_hint"] = cuisine_hint
+    return req.model_copy(update=update)
+
+
 def generate_meal_plan(req: MealPlanRequest) -> MealPlanResult:
     if req.end_date < req.start_date:
         raise GenerationError("end_date is before start_date.")
 
+    days = [
+        req.start_date + timedelta(days=i)
+        for i in range((req.end_date - req.start_date).days + 1)
+    ]
+    if len(days) > 1 and settings.parallel_generation:
+        return _generate_parallel(req, days)
+    return _generate_one_shot(req)
+
+
+def _generate_parallel(req: MealPlanRequest, days: list[date]) -> MealPlanResult:
+    """Fan out one single-day generation per day, concurrently, then merge.
+
+    Each per-day call reuses the validated one-shot path. Trade-off: days are
+    generated independently, so cross-day variety is weaker than a one-shot plan
+    (AI_LAYER §D1) — acceptable for the latency win.
+    """
+    workers = min(len(days), settings.parallel_max_workers)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(
+                _generate_one_shot,
+                _single_day_request(req, d, req.cuisine_hint or _CUISINES[i % len(_CUISINES)]),
+            ): d
+            for i, d in enumerate(days)
+        }
+        by_day: dict[date, MealPlanResult] = {}
+        for fut in as_completed(futures):
+            by_day[futures[fut]] = fut.result()  # GenerationError propagates -> job fails
+
+    merged_days = []
+    usages: list[Usage] = []
+    repairs = 0
+    for d in days:  # stable, chronological order
+        res = by_day[d]
+        merged_days.extend(res.plan.days)
+        usages.extend(res.usage)
+        repairs += res.repair_attempts
+    return MealPlanResult(
+        plan=GeneratedMealPlan(days=merged_days), usage=usages, repair_attempts=repairs
+    )
+
+
+def _generate_one_shot(req: MealPlanRequest) -> MealPlanResult:
     messages: list[dict[str, Any]] = [
         {"role": "user", "content": build_context_block(req)}
     ]

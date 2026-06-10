@@ -169,8 +169,15 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      subscribe race. **Verified in a real browser**: a 3-day plan generated end-to-end — button
      showed `running` then the plan rendered, driven only by Realtime (no polling). 0005 applies
      from a fresh `db reset`.
-   - TODO next: faster generation (parallel per-day), recipe *iterate*, Open Prices / barcode
-     pantry, token-cost benchmark (AI_LAYER §11), Android.
+   - ✅ Faster generation (parallel per-day) (branch `feat/parallel-generation`): for multi-day
+     plans, `generate_meal_plan` fans out one single-day generation per day concurrently
+     (`ThreadPoolExecutor`) and merges, reusing the validated one-shot path. Config
+     `parallel_generation` (default on). Each concurrent day gets a rotating **cuisine_hint** so
+     days stay distinct (independent calls otherwise converge — saw 3 near-identical meals
+     without it). **Verified live**: 3-day plan 31s→~20s (~1.6x) with good variety
+     (Italian→Mexican→Indian). 38 tests pass.
+   - TODO next: recipe *iterate*, Open Prices / barcode pantry, token-cost benchmark
+     (AI_LAYER §11), Android.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 
