@@ -160,6 +160,17 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      breakdown. Short in-memory cache (1h, no permanent storage) keeps within the free dev quota.
      **Verified live**: onion 2 lb→$2.00, garlic 3 cloves→$0.20, tomatoes 1 can→$0.51 [spoonacular];
      cache reuse confirmed. 37 tests pass (offline + seam; 1 live spoonacular deselected).
+   - ✅ Realtime job updates (branch `feat/realtime-jobs`): the web client now waits for generation
+     via a **Supabase Realtime** subscription on the `generation_jobs` row (`lib/jobs.ts`
+     `waitForJob`) instead of polling. Migration `0005` adds the table to the `supabase_realtime`
+     publication + `replica identity full`; RLS (`generation_jobs_select_member`, already present)
+     means a user only receives their own household's job changes; the socket is authed via
+     `realtime.setAuth(token)`. A catch-up `getJob` on SUBSCRIBED handles the finished-before-
+     subscribe race. **Verified in a real browser**: a 3-day plan generated end-to-end — button
+     showed `running` then the plan rendered, driven only by Realtime (no polling). 0005 applies
+     from a fresh `db reset`.
+   - TODO next: faster generation (parallel per-day), recipe *iterate*, Open Prices / barcode
+     pantry, token-cost benchmark (AI_LAYER §11), Android.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

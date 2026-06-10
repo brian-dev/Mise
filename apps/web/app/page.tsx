@@ -11,6 +11,7 @@ import {
   type PantryItem,
   type ShoppingListDetail,
 } from "../lib/api";
+import { waitForJob } from "../lib/jobs";
 import { Login, SignOutButton, useSession } from "./auth";
 
 const card: React.CSSProperties = {
@@ -112,21 +113,11 @@ function Home({ email }: { email?: string }) {
         budget: budget ? Number(budget) : null,
       });
 
-      // Poll the job until it finishes (Realtime push is a later enhancement).
+      // Wait for the job via Supabase Realtime (no polling).
       try {
-        for (;;) {
-          const job = await api.getJob(job_id);
-          setGenStatus(job.status);
-          if (job.status === "done") {
-            const id = job.result?.meal_plan_id;
-            if (id) setPlan(await api.getMealPlan(id));
-            return;
-          }
-          if (job.status === "failed") {
-            throw new Error(job.error ?? "generation failed");
-          }
-          await new Promise((r) => setTimeout(r, 1500));
-        }
+        const job = await waitForJob(job_id, setGenStatus);
+        const id = job.result?.meal_plan_id;
+        if (id) setPlan(await api.getMealPlan(id));
       } finally {
         setGenStatus(null);
       }
