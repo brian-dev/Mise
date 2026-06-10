@@ -344,7 +344,7 @@ function Home({ email }: { email?: string }) {
                   disabled={busy === "estimate"}
                   style={{ marginRight: 8 }}
                 >
-                  {busy === "estimate" ? "Estimating…" : "Estimate remaining prices (AI)"}
+                  {busy === "estimate" ? "Estimating…" : "Estimate remaining prices"}
                 </button>
               )}
               <button data-testid="purchase" onClick={markPurchased} disabled={busy === "purchase"}>

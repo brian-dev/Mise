@@ -39,7 +39,7 @@ from .db import (
 )
 from .generation import GenerationError, generate_meal_plan, generate_recipe
 from .pantry import cook_meal
-from .pricing import PricingError, PricingItem, estimate_prices
+from .pricing import PricingError, PricingItem, resolve_prices
 from .schemas import Dietary, MealPlanRequest, PantryItem, RecipeRequest, Unit
 from .shopping import (
     apply_estimated_prices,
@@ -262,6 +262,7 @@ class EstimatePricesResponse(BaseModel):
     shopping_list_id: UUID
     estimated_total: Decimal
     items_estimated: int
+    sources: dict[str, int]  # e.g. {"spoonacular": 3, "ai": 1}
 
 
 @app.post(
@@ -271,8 +272,9 @@ class EstimatePricesResponse(BaseModel):
 def estimate_list_prices(
     shopping_list_id: UUID, user: UUID | None = Depends(current_user)
 ) -> EstimatePricesResponse:
-    """Fill in prices for items the USDA path couldn't price, via the AI fallback
-    (AI_LAYER §9). Idempotent-ish: only touches items still missing a price."""
+    """Fill in prices for items the USDA path couldn't price (ARCHITECTURE §7):
+    paid-tier Spoonacular first (when configured), AI estimate for the rest. Only
+    touches items still missing a price."""
     with connect() as conn:
         try:
             require_membership(
@@ -290,6 +292,7 @@ def estimate_list_prices(
             shopping_list_id=shopping_list_id,
             estimated_total=Decimal(str(current["estimated_total"])),
             items_estimated=0,
+            sources={},
         )
 
     pricing_items = [
@@ -301,7 +304,7 @@ def estimate_list_prices(
         for it in items
     ]
     try:
-        result = estimate_prices(pricing_items, region=region, store=store)
+        result = resolve_prices(pricing_items, region=region, store=store)
     except PricingError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
@@ -310,10 +313,14 @@ def estimate_list_prices(
     ]
     with connect() as conn:
         total = apply_estimated_prices(conn, shopping_list_id, priced)
+    sources: dict[str, int] = {}
+    for s in result.sources:
+        sources[s] = sources.get(s, 0) + 1
     return EstimatePricesResponse(
         shopping_list_id=shopping_list_id,
         estimated_total=total,
         items_estimated=len(priced),
+        sources=sources,
     )
 
 

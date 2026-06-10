@@ -71,3 +71,48 @@ def estimate_prices(
         )
     prices = [Decimal(str(r["estimated_price"])).quantize(Decimal("0.01")) for r in rows]
     return PricingResult(prices=prices, usage=result.usage)
+
+
+@dataclass
+class ResolveResult:
+    prices: list[Decimal]  # one per item, all filled
+    sources: list[str]  # "spoonacular" | "ai" per item
+    usage: Usage
+
+
+def resolve_prices(
+    items: list[PricingItem],
+    region: str | None = None,
+    store: str | None = None,
+) -> ResolveResult:
+    """Price every item: paid-tier Spoonacular first (when configured), AI estimate
+    for whatever it can't price; free tier is AI-only (ARCHITECTURE §7)."""
+    if not items:
+        return ResolveResult(prices=[], sources=[], usage=Usage(0, 0, 0, 0))
+
+    if not settings.spoonacular_api_key:
+        ai = estimate_prices(items, region, store)
+        return ResolveResult(prices=ai.prices, sources=["ai"] * len(items), usage=ai.usage)
+
+    from .spoonacular import spoonacular_prices
+
+    sp = spoonacular_prices(items)
+    misses = [i for i, p in enumerate(sp) if p is None]
+    usage = Usage(0, 0, 0, 0)
+    ai_by_index: dict[int, Decimal] = {}
+    if misses:
+        ai = estimate_prices([items[i] for i in misses], region, store)
+        usage = ai.usage
+        ai_by_index = {i: ai.prices[j] for j, i in enumerate(misses)}
+
+    prices: list[Decimal] = []
+    sources: list[str] = []
+    for i in range(len(items)):
+        spi = sp[i]
+        if spi is not None:
+            prices.append(spi)
+            sources.append("spoonacular")
+        else:
+            prices.append(ai_by_index[i])
+            sources.append("ai")
+    return ResolveResult(prices=prices, sources=sources, usage=usage)
