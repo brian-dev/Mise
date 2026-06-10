@@ -153,8 +153,13 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      memory `pricing-tiers`): **free tier** = USDA + unit conversion + AI estimate (built, the
      default). **Paid tier** = real-retail sources — **Spoonacular** (recipe costing) +
      **Open Prices** (barcode). Dev keeps Spoonacular within its **free-tier quota**.
-     ⏳ Building the Spoonacular paid-tier provider needs a Spoonacular API key (like the
-     Anthropic key) — pending from the user; will slot behind a pricing-provider seam.
+   - ✅ Spoonacular paid-tier provider (branch `feat/spoonacular-pricing`): `spoonacular.py` calls
+     `parseIngredients` (one batched call, returns `estimatedCost` in cents) for real-retail prices;
+     `pricing.resolve_prices` is the seam — Spoonacular first when `SPOONACULAR_API_KEY` is set, AI
+     estimate for misses; free tier (no key) = AI only. `estimate-prices` now returns a `sources`
+     breakdown. Short in-memory cache (1h, no permanent storage) keeps within the free dev quota.
+     **Verified live**: onion 2 lb→$2.00, garlic 3 cloves→$0.20, tomatoes 1 can→$0.51 [spoonacular];
+     cache reuse confirmed. 37 tests pass (offline + seam; 1 live spoonacular deselected).
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

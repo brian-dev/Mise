@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Ingredient canonicalization fuzzy-match cutoff (AI_LAYER §5).
     ingredient_match_threshold: float = 0.6
 
+    # Paid-tier pricing: when a Spoonacular key is set, the pricing fallback uses
+    # real-retail Spoonacular costs first and the AI estimate only for misses
+    # (ARCHITECTURE §7). Empty -> free tier (AI estimate only).
+    spoonacular_api_key: str = ""
+
     # CORS allow-list for the local web harness (comma-separated origins).
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
