@@ -4,6 +4,7 @@ Secrets and model selection come from the environment / .env. Model defaults
 follow docs/AI_LAYER.md §10 (Sonnet for full plans, Haiku for single recipes).
 """
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +46,11 @@ class Settings(BaseSettings):
 
     # Bounded validation/repair (AI_LAYER §6): one retry, then fail the job.
     max_repair_attempts: int = 1
+
+    # Test mode (MISE_TEST_MODE=true) mounts /v1/test/* helper endpoints used by
+    # E2E tests to reach app states fast and deterministically WITHOUT calling
+    # Claude. Never enable in production.
+    test_mode: bool = Field(default=False, validation_alias="MISE_TEST_MODE")
 
 
 settings = Settings()

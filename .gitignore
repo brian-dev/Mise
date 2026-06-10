@@ -10,6 +10,12 @@ dist/
 *.tsbuildinfo
 next-env.d.ts
 
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
 # Python / uv
 .venv/
 __pycache__/

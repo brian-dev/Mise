@@ -126,10 +126,18 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      for `meal_swap_context` + `swap_meal_recipe` (rolled back). Also **fixed a test-infra bug**:
      the `conn` fixture now primes the outer transaction so `conn.transaction()` blocks become
      savepoints (a test leading with `create_household` was committing/leaking; now CLEAN).
+   - ✅ Testability affordances + Playwright E2E (branch `feat/test-affordances`): test-only
+     hooks behind `MISE_TEST_MODE` (`POST /v1/test/seed-plan` — household + ready plan, no Claude;
+     `POST /v1/test/reset`), `data-testid` selectors across the UI, `GET
+     /v1/households/{id}/latest-plan` so the UI shows an existing plan on selection (also a real
+     UX win), and a Playwright scaffold (`apps/web/playwright.config.ts`, `e2e/loop.spec.ts`,
+     `pnpm --filter @mise/web test:e2e`). **A passing E2E smoke test** drives sign up → seed →
+     load plan → cook → build shopping list in ~2.4s with zero Claude calls. CLAUDE.md gains a
+     "Build for testability" rule.
    - TODO next: AI pricing fallback (AI_LAYER §9), per-household price calibration,
      parallel/streaming generation, Supabase Realtime (replace job polling), recipe *iterate*
-     endpoint, and the token-cost benchmark (AI_LAYER §11). Note: `seed_demo.py` makes ownerless
-     households invisible in the auth'd UI — it's an API/DB-level tool only.
+     endpoint, more `/v1/test/*` hooks as features grow, and the token-cost benchmark
+     (AI_LAYER §11). Note: `seed_demo.py` makes ownerless households invisible in the auth'd UI.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

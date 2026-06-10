@@ -99,6 +99,16 @@ def household_for_meal(conn: psycopg.Connection, meal_id: UUID) -> UUID:
     return cast(UUID, row[0])
 
 
+def latest_meal_plan_id(conn: psycopg.Connection, household_id: UUID) -> UUID | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "select id from meal_plans where household_id = %s order by created_at desc limit 1",
+            (household_id,),
+        )
+        row = cur.fetchone()
+    return cast(UUID, row[0]) if row is not None else None
+
+
 def meal_swap_context(conn: psycopg.Connection, meal_id: UUID) -> dict[str, Any]:
     """Gather what a recipe swap needs: meal type/servings, the household, and the
     other recipe titles in the same plan (for variety)."""

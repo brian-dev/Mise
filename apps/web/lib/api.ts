@@ -117,6 +117,15 @@ export const api = {
     }),
   getJob: (id: string) => req<JobStatus>(`/v1/jobs/${id}`),
   getMealPlan: (id: string) => req<MealPlanDetail>(`/v1/meal-plans/${id}`),
+  // The household's latest plan, or null when there's none (404).
+  getLatestPlan: async (householdId: string): Promise<MealPlanDetail | null> => {
+    try {
+      return await req<MealPlanDetail>(`/v1/households/${householdId}/latest-plan`);
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("404")) return null;
+      throw e;
+    }
+  },
   buildShoppingList: (mealPlanId: string) =>
     req<ShoppingSummary>("/v1/shopping-lists/build", {
       method: "POST",

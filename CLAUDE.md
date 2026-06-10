@@ -42,6 +42,23 @@ the `db` marker (`uv run pytest -m db`). The `live` marker hits **real, paid** C
 with **Vitest + React Testing Library**, end-to-end with **Playwright**. UI/E2E tests must seed
 and tear down their own data (or run against a freshly reset DB) and never leave rows behind.
 
+**Build for testability (required).** As features are added, also add the affordances that make
+them fast and reliable to test — especially for E2E/Playwright:
+- **Test-only hooks behind a flag.** Operations that let a test reach an app state instantly and
+  deterministically live under `/v1/test/*`, mounted only when `MISE_TEST_MODE=true` (never in
+  prod). Today: `POST /v1/test/seed-plan` (create a household + ready plan for the caller, **no
+  Claude**) and `POST /v1/test/reset` (delete the caller's data). Add more such hooks as needed.
+- **Never call real Claude from E2E.** Seed via the hook (deterministic, free) instead of driving
+  generation. Real-Claude coverage stays in the `live`-marked pytest tests.
+- **Stable selectors.** UI elements tests interact with carry `data-testid` (don't rely on text
+  or DOM structure).
+- **Programmatic auth.** The local stack auto-confirms sign-ups, so E2E signs up a unique user
+  per run and reads the Supabase session token from `localStorage` for API hooks.
+
+**E2E (Playwright):** `apps/web/e2e/*.spec.ts`, run with `pnpm --filter @mise/web test:e2e`
+(needs Supabase up + the AI service on :8000 started with `MISE_TEST_MODE=true`). Keep E2E out of
+the default `turbo run test` (it needs running servers).
+
 **Before merging:** `pnpm exec turbo run typecheck test` is green, and the dev DB row counts are
 unchanged by the test run.
 

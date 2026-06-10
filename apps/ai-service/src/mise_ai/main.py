@@ -30,6 +30,7 @@ from .db import (
     household_for_meal,
     household_for_meal_plan,
     household_for_shopping_list,
+    latest_meal_plan_id,
     list_households,
     meal_swap_context,
     persist_meal_plan,
@@ -49,6 +50,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Test-only helper endpoints (/v1/test/*), mounted only in test mode.
+if settings.test_mode:
+    from .test_routes import router as test_router
+
+    app.include_router(test_router)
 
 
 @app.get("/v1/health")
@@ -85,6 +92,20 @@ def pantry(
     with connect() as conn:
         require_membership(conn, user, household_id)
         return get_pantry(conn, household_id)
+
+
+@app.get("/v1/households/{household_id}/latest-plan")
+def latest_plan(
+    household_id: UUID, user: UUID | None = Depends(current_user)
+) -> dict[str, Any]:
+    """The household's most recent meal plan (404 if none) — lets the UI show an
+    existing plan without regenerating."""
+    with connect() as conn:
+        require_membership(conn, user, household_id)
+        pid = latest_meal_plan_id(conn, household_id)
+        if pid is None:
+            raise HTTPException(status_code=404, detail="no meal plan for this household")
+        return get_meal_plan(conn, pid)
 
 
 @app.get("/v1/meal-plans/{meal_plan_id}")
