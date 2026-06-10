@@ -140,11 +140,20 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      per-lb baseline). Count units / cross-dimension stay unpriced (AI fallback next). Target is a
      rough ±10% estimate, not precision. **Verified**: offline conversion tests + a shopping db
      test (rolled back). 27 tests pass.
-   - TODO next: AI pricing fallback (AI_LAYER §9) for still-unpriced items (count units like
-     "2 cloves", cross-dimension, unknown ingredients); per-household price calibration (spec
-     §3.6); parallel/streaming generation; Supabase Realtime (replace job polling); recipe
-     *iterate*; more `/v1/test/*` hooks; token-cost benchmark (AI_LAYER §11). Note: `seed_demo.py`
-     makes ownerless households invisible in the auth'd UI.
+   - ✅ AI pricing fallback (branch `feat/ai-pricing-fallback`, AI_LAYER §9): `pricing.py` +
+     `POST /v1/shopping-lists/{id}/estimate-prices` fills prices for items the USDA path couldn't
+     (count units, cross-dimension, unknown ingredients) using Haiku + a forced `emit_prices`
+     tool that reasons in typical U.S. retail packaging terms. Web has an "Estimate remaining
+     prices (AI)" button shown when items are unpriced. **Verified live**: garlic 3 cloves→$0.10,
+     1 can tomatoes→$1.20, 1 cup milk→$0.50 (sensible). Offline + db tests pass (31).
+   - TODO next: per-household price calibration (spec §3.6 — anchor prices to localize the
+     baseline); a real retail pricing source for v2 (see note below); parallel/streaming
+     generation; Supabase Realtime; recipe *iterate*; token-cost benchmark (AI_LAYER §11).
+   - Pricing sources (research): USDA baseline = free national averages, no packaging.
+     Better real-retail options for later: **Kroger API** (real per-store prices + package
+     sizes), **Spoonacular** (recipe-costing: ingredient→product + package amounts),
+     **Open Food Facts "Open Prices"** (open, crowd-sourced, packaging-aware; aligns with the
+     OFF barcode use). The AI fallback already reasons in packaging terms as a stopgap.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

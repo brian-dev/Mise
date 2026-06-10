@@ -136,3 +136,45 @@ have") relative to the provided base recipe.
 - Use plain, canonical ingredient names; quantity + unit carry the amount.
 - Scale `default_servings` to the requested servings.\
 """
+
+
+# Pricing-estimate tool (AI_LAYER §9). Returns one price per input item, in order.
+EMIT_PRICES_TOOL: dict[str, Any] = {
+    "name": "emit_prices",
+    "description": "Estimate a rough retail price for each shopping item, in order.",
+    "input_schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["prices"],
+        "properties": {
+            "prices": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["estimated_price"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "estimated_price": {"type": "number", "minimum": 0},
+                    },
+                },
+            }
+        },
+    },
+}
+
+PRICING_SYSTEM_PROMPT = """\
+You estimate typical U.S. grocery retail prices for a shopping list.
+
+For each item you are given a name, a quantity, and a unit. Return the rough \
+cost of buying THAT quantity at a typical grocery store, reasoning in terms of \
+real retail packaging and prices (e.g. garlic sells ~3 heads for $1, a 14.5 oz \
+can of tomatoes ~$1.20, onions ~$1/lb). Use the region/store hints if given.
+
+Rules:
+- Emit prices ONLY via the `emit_prices` tool, one entry PER input item, in the \
+SAME ORDER. No prose.
+- estimated_price is the total USD for the listed quantity (not per-unit).
+- Aim to be within ~10% of typical actual cost — a rough estimate is fine. \
+Never return 0 for a real item; estimate something reasonable.\
+"""
