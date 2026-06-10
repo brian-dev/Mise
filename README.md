@@ -78,6 +78,17 @@ pnpm db:reset      # drops all data, re-applies migrations + seed
 See [`CLAUDE.md`](CLAUDE.md) → Testing for the full convention (API tests with pytest +
 rolled-back fixtures; UI tests with Vitest/RTL + Playwright; nothing leaves the DB dirty).
 
+### End-to-end tests (Playwright)
+
+E2E tests need the stack running in **test mode** (mounts `/v1/test/*` seed/reset hooks so
+tests reach app states instantly without calling Claude):
+
+```sh
+pnpm dev:test                                  # same as `pnpm dev` but with MISE_TEST_MODE=true
+pnpm --filter @mise/web exec playwright install chromium   # first time only
+pnpm --filter @mise/web test:e2e               # in another terminal
+```
+
 ## Inspect the database
 
 - Supabase Studio: http://localhost:54323

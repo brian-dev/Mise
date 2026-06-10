@@ -8,7 +8,8 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": ["MISE_TEST_MODE"]
     },
     "lint": {
       "dependsOn": ["^build"]

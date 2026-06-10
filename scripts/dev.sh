@@ -46,6 +46,10 @@ if [ ! -f apps/ai-service/.env ] || ! grep -Eq '^ANTHROPIC_API_KEY=.+' apps/ai-s
   echo "   Add a key: cp apps/ai-service/.env.example apps/ai-service/.env  then edit it."
 fi
 
+if [ "${MISE_TEST_MODE:-}" = "true" ]; then
+  echo "⚠  TEST MODE — /v1/test/* hooks are exposed (seed/reset). For E2E only."
+fi
+
 echo
 echo "▶ Starting AI service (http://localhost:8000) + web (http://localhost:3000)…"
 echo "  Open http://localhost:3000 — Ctrl-C to stop."
