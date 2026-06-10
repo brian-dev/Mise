@@ -28,8 +28,12 @@ export function useSession(): Session | null | undefined {
 export function SignOutButton({ email }: { email?: string }) {
   return (
     <span style={{ float: "right", fontSize: 14, color: "#6b6256" }}>
-      {email}{" "}
-      <button onClick={() => supabase.auth.signOut()} style={{ marginLeft: 8 }}>
+      <span data-testid="user-email">{email}</span>{" "}
+      <button
+        data-testid="sign-out"
+        onClick={() => supabase.auth.signOut()}
+        style={{ marginLeft: 8 }}
+      >
         Sign out
       </button>
     </span>
@@ -63,22 +67,29 @@ export function Login() {
         <p style={{ color: "#6b6256" }}>Sign in to plan your meals.</p>
         {error && <div style={{ color: "#c0392b", marginBottom: 8 }}>{error}</div>}
         <input
+          data-testid="login-email"
           placeholder="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           style={{ display: "block", width: "100%", padding: 8, marginBottom: 8 }}
         />
         <input
+          data-testid="login-password"
           type="password"
           placeholder="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           style={{ display: "block", width: "100%", padding: 8, marginBottom: 12 }}
         />
-        <button onClick={() => run("in")} disabled={busy} style={{ marginRight: 8 }}>
+        <button
+          data-testid="login-signin"
+          onClick={() => run("in")}
+          disabled={busy}
+          style={{ marginRight: 8 }}
+        >
           Sign in
         </button>
-        <button onClick={() => run("up")} disabled={busy}>
+        <button data-testid="login-signup" onClick={() => run("up")} disabled={busy}>
           Sign up
         </button>
       </div>

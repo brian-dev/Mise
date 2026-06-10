@@ -62,7 +62,14 @@ function Home({ email }: { email?: string }) {
   }, [refreshHouseholds]);
 
   useEffect(() => {
-    if (householdId) refreshPantry(householdId).catch((e) => setError(String(e)));
+    if (!householdId) return;
+    refreshPantry(householdId).catch((e) => setError(String(e)));
+    // Load the household's existing plan (if any) so it shows without regenerating.
+    setShopping(null);
+    api
+      .getLatestPlan(householdId)
+      .then(setPlan)
+      .catch((e) => setError(String(e)));
   }, [householdId, refreshPantry]);
 
   async function run(label: string, fn: () => Promise<void>) {
@@ -168,7 +175,12 @@ function Home({ email }: { email?: string }) {
       {/* Household */}
       <section style={card}>
         <h2>1 · Household</h2>
-        <select value={householdId} onChange={(e) => setHouseholdId(e.target.value)} style={{ padding: 6 }}>
+        <select
+          data-testid="household-select"
+          value={householdId}
+          onChange={(e) => setHouseholdId(e.target.value)}
+          style={{ padding: 6 }}
+        >
           <option value="">— select —</option>
           {households.map((h) => (
             <option key={h.id} value={h.id}>
@@ -246,6 +258,7 @@ function Home({ email }: { email?: string }) {
           </label>
         </div>
         <button
+          data-testid="generate"
           onClick={generate}
           disabled={!householdId || mealTypes.length === 0 || busy === "generate"}
           style={{ marginTop: 12 }}
@@ -273,16 +286,19 @@ function Home({ email }: { email?: string }) {
             <div key={d.date} style={{ marginBottom: 8 }}>
               <strong>{d.date}</strong>
               {d.meals.map((m) => (
-                <div key={m.meal_id} style={{ marginLeft: 12 }}>
-                  [{m.meal_type}] {m.recipe_title} — {m.servings} servings{" "}
+                <div key={m.meal_id} data-testid="meal-row" style={{ marginLeft: 12 }}>
+                  [{m.meal_type}] <span data-testid="recipe-title">{m.recipe_title}</span> —{" "}
+                  {m.servings} servings{" "}
                   {m.cooked_at ? (
-                    <span style={{ color: "#2e7d32" }}>✓ cooked</span>
+                    <span data-testid="cooked" style={{ color: "#2e7d32" }}>
+                      ✓ cooked
+                    </span>
                   ) : (
                     <>
-                      <button onClick={() => cook(m.meal_id)} disabled={!!busy}>
+                      <button data-testid="cook" onClick={() => cook(m.meal_id)} disabled={!!busy}>
                         Cook
                       </button>{" "}
-                      <button onClick={() => swap(m.meal_id)} disabled={!!busy}>
+                      <button data-testid="swap" onClick={() => swap(m.meal_id)} disabled={!!busy}>
                         {busy === `swap-${m.meal_id}` ? "Swapping…" : "Swap"}
                       </button>
                     </>
@@ -291,7 +307,12 @@ function Home({ email }: { email?: string }) {
               ))}
             </div>
           ))}
-          <button onClick={buildList} disabled={busy === "shopping"} style={{ marginTop: 8 }}>
+          <button
+            data-testid="build-shopping"
+            onClick={buildList}
+            disabled={busy === "shopping"}
+            style={{ marginTop: 8 }}
+          >
             Build shopping list
           </button>
         </section>
@@ -299,10 +320,10 @@ function Home({ email }: { email?: string }) {
 
       {/* Shopping list */}
       {shopping && (
-        <section style={card}>
+        <section style={card} data-testid="shopping-list">
           <h2>4 · Shopping list ({shopping.status})</h2>
           <div>
-            Estimated total: <strong>${shopping.estimated_total}</strong>
+            Estimated total: <strong data-testid="estimated-total">${shopping.estimated_total}</strong>
           </div>
           {shopping.status !== "purchased" && (
             <button onClick={markPurchased} disabled={busy === "purchase"} style={{ marginTop: 8 }}>
