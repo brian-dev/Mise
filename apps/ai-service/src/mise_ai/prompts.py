@@ -33,6 +33,7 @@ def build_context_block(req: MealPlanRequest) -> str:
         "region": req.region,
         "store_preference": req.store_preference,
         "variety_target": req.variety_target,
+        "cuisine_hint": req.cuisine_hint,
     }
     # Deterministic serialization (sorted keys) keeps the block stable for any
     # given request — relevant once we cache per-request context.

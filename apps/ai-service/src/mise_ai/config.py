@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     # Bounded validation/repair (AI_LAYER §6): one retry, then fail the job.
     max_repair_attempts: int = 1
 
+    # Generate each day of a multi-day plan concurrently (one Claude call per day)
+    # instead of one big call — cuts multi-day latency toward single-day time, at
+    # the cost of some cross-day variety coherence (AI_LAYER §D1). Bounded fan-out.
+    parallel_generation: bool = True
+    parallel_max_workers: int = 7
+
     # Test mode (MISE_TEST_MODE=true) mounts /v1/test/* helper endpoints used by
     # E2E tests to reach app states fast and deterministically WITHOUT calling
     # Claude. Never enable in production.
