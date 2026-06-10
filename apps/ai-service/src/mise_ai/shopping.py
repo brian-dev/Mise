@@ -16,6 +16,8 @@ from uuid import UUID
 
 import psycopg
 
+from .units import convert_quantity
+
 
 @dataclass
 class Restock:
@@ -108,7 +110,10 @@ def build_shopping_list(conn: psycopg.Connection, meal_plan_id: UUID) -> Shoppin
             if needed <= 0:
                 continue  # fully covered by the pantry
 
-            # Price only when units match the USDA baseline and a price exists.
+            # Price against the USDA baseline, converting the recipe unit into the
+            # USDA unit where the dimensions are compatible (spec §3.6). Items that
+            # can't be converted (count units, cross-dimension) or have no baseline
+            # price stay unpriced — the AI estimate fallback (AI_LAYER §9) is next.
             cur.execute(
                 "select usda_price_per_unit, usda_unit from ingredients where id = %s",
                 (ingredient_id,),
@@ -116,10 +121,12 @@ def build_shopping_list(conn: psycopg.Connection, meal_plan_id: UUID) -> Shoppin
             price_row = cur.fetchone()
             price_per_unit, usda_unit = price_row if price_row else (None, None)
             estimated_price: Decimal | None = None
-            if price_per_unit is not None and usda_unit == unit:
-                estimated_price = (needed * price_per_unit).quantize(Decimal("0.01"))
-                estimated_total += estimated_price
-                items_priced += 1
+            if price_per_unit is not None and usda_unit is not None:
+                converted = convert_quantity(needed, unit, usda_unit)
+                if converted is not None:
+                    estimated_price = (converted * price_per_unit).quantize(Decimal("0.01"))
+                    estimated_total += estimated_price
+                    items_priced += 1
 
             cur.execute(
                 """
