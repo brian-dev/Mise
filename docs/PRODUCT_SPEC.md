@@ -141,13 +141,23 @@ quantity_deducted = RecipeIngredient.quantity × (Meal.servings ÷ Recipe.defaul
 
 ### 3.6 Pricing & Budget Estimation
 
-- **Goal:** estimate shopping trip cost accurate to within 10-15% of actual
-- **v1 Approach:**
-  1. **USDA food price data** — public dataset, updated regularly, national averages with regional breakdowns. Used as the baseline price per ingredient.
-  2. **User price calibration** — on setup, user enters prices for a small set of anchor items (e.g., milk, eggs, bread, chicken breast). This calibrates the USDA baseline to their local reality.
-- **Future (v2+):** store API integration (Kroger, HEB, etc.) and/or crowd-sourced pricing from users confirming actual prices post-shop
-- **AI-assisted regional estimation:** explore using LLM with store name and region as context to improve price estimates for specific retailers (e.g., HEB in Floresville, TX vs. HEB in Pleasanton, TX)
-- Real-time pricing integration is a **nice-to-have**, not a v1 requirement
+- **Goal:** a *rough* estimate — a budget is only ever approximate (prices change daily and by
+  region). Target ~±10% (within 10–15%), and don't chase false precision.
+- **Free tier (implemented):**
+  1. **USDA food price data** — baseline price per ingredient (per `usda_unit`).
+  2. **Unit conversion** — convert the recipe quantity into the USDA unit (mass↔mass,
+     volume↔volume) so items price even when units differ.
+  3. **AI estimate fallback** — for whatever's left (count units, cross-dimension, unknown
+     ingredients), an LLM estimates a rough retail price reasoning in typical-packaging terms.
+  4. **User price calibration** (planned) — anchor a few local prices (milk, eggs, bread) to
+     scale the USDA baseline toward the user's region.
+- **Paid tier (planned):** real-retail data sources for paying users —
+  - **Spoonacular** — ingredient/recipe cost with product + package amounts (recipe costing).
+  - **Open Food Facts "Open Prices"** — open, crowd-sourced, packaging-aware prices by barcode
+    (pairs with pantry barcode scanning).
+  - For development we use Spoonacular within its **free-tier quota** until there are real users.
+- **Further out (v2+):** direct store-API pricing (Kroger, HEB, etc.) for live per-store prices.
+- Real-time pricing integration is **not a v1 requirement**.
 
 ---
 
@@ -317,14 +327,18 @@ All models below are in consideration. Final strategy will be determined as the 
 
 ### 6.1 Subscription Tiers (B2C)
 
-| Tier | Households | Meal Plans | AI Generations | Price |
-|---|---|---|---|---|
-| **Free** | 1 | 1 active at a time | Limited (~5/month) | $0 |
-| **Personal** | 1 | Unlimited history | Unlimited | ~$5–8/mo |
-| **Family** | Up to 5 | Unlimited history | Unlimited | ~$12–15/mo |
-| **Premium** | Unlimited | Unlimited | Unlimited + priority | ~$20–25/mo |
+| Tier | Households | Meal Plans | AI Generations | Pricing source | Price |
+|---|---|---|---|---|---|
+| **Free** | 1 | 1 active at a time | Limited (~5/month) | USDA + unit conversion + AI estimate | $0 |
+| **Personal** | 1 | Unlimited history | Unlimited | + real-retail (Spoonacular / Open Prices) | ~$5–8/mo |
+| **Family** | Up to 5 | Unlimited history | Unlimited | + real-retail | ~$12–15/mo |
+| **Premium** | Unlimited | Unlimited | Unlimited + priority | + real-retail | ~$20–25/mo |
 
 **Notes:**
+- **Pricing data is a tier lever** (decided 2026-06): the free tier uses the USDA baseline +
+  unit conversion + AI estimate (good for a rough ±10%, no third-party cost); paid tiers add
+  real-retail sources (Spoonacular for recipe costing, Open Food Facts "Open Prices" for
+  barcode-keyed prices). Dev keeps Spoonacular within its free-tier quota until there are users.
 - AI generation limits on the free tier are the primary cost-control lever (LLM API calls are the main variable cost)
 - Multi-household access is the primary upsell from Personal → Family/Premium
 - Annual pricing discounts to be determined

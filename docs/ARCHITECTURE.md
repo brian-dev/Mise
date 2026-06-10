@@ -221,6 +221,24 @@ When building a shopping list:
 
 Target accuracy: **within 10–15%** of actual (per spec).
 
+### Pricing sources by subscription tier (decided 2026-06)
+A budget is only ever a rough estimate (prices change daily and by region; we shoot for ~±10%).
+Pricing is intentionally tiered:
+
+- **Free tier — implemented, the default.** USDA baseline → **unit conversion** (`units.py`,
+  mass↔mass / volume↔volume) → **AI estimate** for whatever's left (`pricing.py`,
+  `POST /v1/shopping-lists/{id}/estimate-prices`). No third-party dependency, cacheable, free.
+- **Paid tier — planned.** Real-retail data for paying users:
+  - **Spoonacular** — ingredient/recipe **cost** with product + package amounts (best fit for
+    recipe-driven shopping-list costing).
+  - **Open Food Facts "Open Prices"** — open, crowd-sourced, packaging-aware prices keyed by
+    barcode (best fit for the pantry **barcode-scan** flow).
+  They slot in behind a pricing-provider seam: a configured/entitled paid provider supplies or
+  overrides prices; otherwise the free path runs. Per-user entitlement arrives with billing —
+  for now it's a server config gate.
+  - **Dev note:** keep Spoonacular within its **free-tier quota** until there are real users
+    (cache results, batch calls, fail back to the free path on quota exhaustion).
+
 ---
 
 ## 8. API Surface

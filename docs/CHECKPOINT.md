@@ -149,11 +149,12 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
    - TODO next: per-household price calibration (spec §3.6 — anchor prices to localize the
      baseline); a real retail pricing source for v2 (see note below); parallel/streaming
      generation; Supabase Realtime; recipe *iterate*; token-cost benchmark (AI_LAYER §11).
-   - Pricing sources (research): USDA baseline = free national averages, no packaging.
-     Better real-retail options for later: **Kroger API** (real per-store prices + package
-     sizes), **Spoonacular** (recipe-costing: ingredient→product + package amounts),
-     **Open Food Facts "Open Prices"** (open, crowd-sourced, packaging-aware; aligns with the
-     OFF barcode use). The AI fallback already reasons in packaging terms as a stopgap.
+   - ✅ Pricing tiering decided (2026-06; docs `ARCHITECTURE §7`, `PRODUCT_SPEC §3.6/§6.1`,
+     memory `pricing-tiers`): **free tier** = USDA + unit conversion + AI estimate (built, the
+     default). **Paid tier** = real-retail sources — **Spoonacular** (recipe costing) +
+     **Open Prices** (barcode). Dev keeps Spoonacular within its **free-tier quota**.
+     ⏳ Building the Spoonacular paid-tier provider needs a Spoonacular API key (like the
+     Anthropic key) — pending from the user; will slot behind a pricing-provider seam.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 
