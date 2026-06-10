@@ -99,3 +99,50 @@ def test_build_shopping_list(conn: psycopg.Connection) -> None:
         qty, price = cur.fetchone()  # type: ignore[misc]
         assert qty == Decimal("1.500")
         assert price == Decimal("1.35")
+
+
+def test_pricing_converts_units(conn: psycopg.Connection) -> None:
+    """An ingredient bought in oz is priced against a per-lb USDA baseline."""
+    with conn.cursor() as cur:
+        cur.execute("insert into households (name) values ('Conv HH') returning id")
+        household_id = cur.fetchone()[0]  # type: ignore[index]
+        cur.execute("select id from ingredients where name = 'Yellow Onion'")
+        onion_id = cur.fetchone()[0]  # type: ignore[index]
+
+    req = MealPlanRequest(
+        household_id=household_id,
+        start_date="2026-06-10",  # type: ignore[arg-type]
+        end_date="2026-06-10",  # type: ignore[arg-type]
+        household_size=2,
+        meal_types=[MealType.dinner],
+    )
+    recipe = GeneratedRecipe(
+        title="Onion Soup",
+        cuisine_tags=["french"],
+        default_servings=2,
+        instructions="Cook.",
+        # 32 oz onion; usda_unit is lb @ 0.90 -> 32 oz = 2 lb -> $1.80.
+        ingredients=[GeneratedIngredient(name="yellow onion", quantity=32, unit=Unit.oz)],
+    )
+    plan = GeneratedMealPlan(
+        days=[
+            GeneratedDay(
+                date="2026-06-10",  # type: ignore[arg-type]
+                meals=[GeneratedMeal(meal_type=MealType.dinner, servings=2, recipe=recipe)],
+            )
+        ]
+    )
+    meal_plan_id = persist_meal_plan(conn, plan, req)
+    result = build_shopping_list(conn, meal_plan_id)
+
+    assert result.items_priced == 1  # priced despite oz != lb
+    assert result.estimated_total == Decimal("1.80")
+    with conn.cursor() as cur:
+        cur.execute(
+            "select unit, estimated_price from shopping_list_items "
+            "where shopping_list_id = %s and ingredient_id = %s",
+            (result.shopping_list_id, onion_id),
+        )
+        unit, price = cur.fetchone()  # type: ignore[misc]
+        assert unit == "oz"  # stored in the recipe's unit
+        assert price == Decimal("1.80")

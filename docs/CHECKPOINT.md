@@ -134,10 +134,17 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      `pnpm --filter @mise/web test:e2e`). **A passing E2E smoke test** drives sign up → seed →
      load plan → cook → build shopping list in ~2.4s with zero Claude calls. CLAUDE.md gains a
      "Build for testability" rule.
-   - TODO next: AI pricing fallback (AI_LAYER §9), per-household price calibration,
-     parallel/streaming generation, Supabase Realtime (replace job polling), recipe *iterate*
-     endpoint, more `/v1/test/*` hooks as features grow, and the token-cost benchmark
-     (AI_LAYER §11). Note: `seed_demo.py` makes ownerless households invisible in the auth'd UI.
+   - ✅ Pricing unit conversion (branch `feat/pricing-unit-conversion`, spec §3.6): `units.py`
+     converts recipe quantities to the ingredient's USDA unit (mass↔mass, volume↔volume) so the
+     shopping list prices items even when the units differ (e.g., 32 oz onion → $1.80 against a
+     per-lb baseline). Count units / cross-dimension stay unpriced (AI fallback next). Target is a
+     rough ±10% estimate, not precision. **Verified**: offline conversion tests + a shopping db
+     test (rolled back). 27 tests pass.
+   - TODO next: AI pricing fallback (AI_LAYER §9) for still-unpriced items (count units like
+     "2 cloves", cross-dimension, unknown ingredients); per-household price calibration (spec
+     §3.6); parallel/streaming generation; Supabase Realtime (replace job polling); recipe
+     *iterate*; more `/v1/test/*` hooks; token-cost benchmark (AI_LAYER §11). Note: `seed_demo.py`
+     makes ownerless households invisible in the auth'd UI.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 
