@@ -3,16 +3,8 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 
+import { Button, Card, Input } from "../components/ui";
 import { supabase } from "../lib/supabase";
-
-const card: React.CSSProperties = {
-  border: "1px solid #e2ddd2",
-  borderRadius: 10,
-  padding: "1.25rem",
-  maxWidth: 360,
-  margin: "4rem auto",
-  background: "#fff",
-};
 
 /** Tracks the current Supabase session. `undefined` = still loading. */
 export function useSession(): Session | null | undefined {
@@ -27,12 +19,12 @@ export function useSession(): Session | null | undefined {
 
 export function SignOutButton({ email }: { email?: string }) {
   return (
-    <span style={{ float: "right", fontSize: 14, color: "#6b6256" }}>
+    <span className="float-right text-sm text-muted">
       <span data-testid="user-email">{email}</span>{" "}
       <button
         data-testid="sign-out"
         onClick={() => supabase.auth.signOut()}
-        style={{ marginLeft: 8 }}
+        className="ml-2 font-semibold text-accent-ink hover:underline"
       >
         Sign out
       </button>
@@ -61,38 +53,49 @@ export function Login() {
   }
 
   return (
-    <main style={{ fontFamily: "system-ui" }}>
-      <div style={card}>
-        <h1 style={{ marginTop: 0 }}>Mise</h1>
-        <p style={{ color: "#6b6256" }}>Sign in to plan your meals.</p>
-        {error && <div style={{ color: "#c0392b", marginBottom: 8 }}>{error}</div>}
-        <input
-          data-testid="login-email"
-          placeholder="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ display: "block", width: "100%", padding: 8, marginBottom: 8 }}
-        />
-        <input
-          data-testid="login-password"
-          type="password"
-          placeholder="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ display: "block", width: "100%", padding: 8, marginBottom: 12 }}
-        />
-        <button
-          data-testid="login-signin"
-          onClick={() => run("in")}
-          disabled={busy}
-          style={{ marginRight: 8 }}
-        >
-          Sign in
-        </button>
-        <button data-testid="login-signup" onClick={() => run("up")} disabled={busy}>
-          Sign up
-        </button>
-      </div>
+    <main className="min-h-screen grid place-items-center bg-bg px-4">
+      <Card className="w-full max-w-sm p-7">
+        <div className="font-display text-3xl font-semibold tracking-tight">
+          Mise<span className="text-accent">.</span>
+        </div>
+        <p className="mt-1 text-muted">Plan. Shop. Cook. Repeat.</p>
+
+        {error && (
+          <div className="mt-4 rounded border border-accent/30 bg-accent-soft px-3 py-2 text-sm text-accent-ink">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-5 space-y-3">
+          <Input
+            data-testid="login-email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Input
+            data-testid="login-password"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+
+        <div className="mt-5 flex gap-3">
+          <Button data-testid="login-signin" onClick={() => run("in")} disabled={busy}>
+            Sign in
+          </Button>
+          <Button
+            data-testid="login-signup"
+            variant="ghost"
+            onClick={() => run("up")}
+            disabled={busy}
+          >
+            Create account
+          </Button>
+        </div>
+      </Card>
     </main>
   );
 }
