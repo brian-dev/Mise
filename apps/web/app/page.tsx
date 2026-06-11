@@ -143,6 +143,15 @@ function Home({ email }: { email?: string }) {
       if (plan) setPlan(await api.getMealPlan(plan.meal_plan_id));
     });
 
+  const iterate = (mealId: string) => {
+    const modify = window.prompt('How should I change this dish? (e.g. "spicier", "make it vegan")');
+    if (!modify) return;
+    void run(`iterate-${mealId}`, async () => {
+      await api.iterateMeal(mealId, modify);
+      if (plan) setPlan(await api.getMealPlan(plan.meal_plan_id));
+    });
+  };
+
   const estimatePrices = () =>
     run("estimate", async () => {
       if (!shopping) return;
@@ -298,6 +307,9 @@ function Home({ email }: { email?: string }) {
                       </button>{" "}
                       <button data-testid="swap" onClick={() => swap(m.meal_id)} disabled={!!busy}>
                         {busy === `swap-${m.meal_id}` ? "Swapping…" : "Swap"}
+                      </button>{" "}
+                      <button data-testid="iterate" onClick={() => iterate(m.meal_id)} disabled={!!busy}>
+                        {busy === `iterate-${m.meal_id}` ? "Iterating…" : "Modify"}
                       </button>
                     </>
                   )}

@@ -115,7 +115,7 @@ def meal_swap_context(conn: psycopg.Connection, meal_id: UUID) -> dict[str, Any]
     with conn.cursor() as cur:
         cur.execute(
             """
-            select m.meal_type, m.servings, mp.household_id, mp.id
+            select m.meal_type, m.servings, mp.household_id, mp.id, m.recipe_id
             from meals m
             join meal_plan_days d on d.id = m.meal_plan_day_id
             join meal_plans mp on mp.id = d.meal_plan_id
@@ -126,7 +126,7 @@ def meal_swap_context(conn: psycopg.Connection, meal_id: UUID) -> dict[str, Any]
         row = cur.fetchone()
         if row is None:
             raise ValueError(f"meal {meal_id} not found")
-        meal_type, servings, household_id, meal_plan_id = row
+        meal_type, servings, household_id, meal_plan_id, recipe_id = row
 
         cur.execute(
             """
@@ -144,6 +144,48 @@ def meal_swap_context(conn: psycopg.Connection, meal_id: UUID) -> dict[str, Any]
         "servings": servings,
         "household_id": household_id,
         "avoid_titles": avoid_titles,
+        "recipe_id": recipe_id,
+    }
+
+
+def get_recipe_for_prompt(conn: psycopg.Connection, recipe_id: UUID) -> dict[str, Any]:
+    """Reconstruct a recipe as the AI emits it (ingredient names, not ids) so it can
+    be passed back as the base for iteration (AI_LAYER §8)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "select title, description, cuisine_tags, prep_time, cook_time, "
+            "default_servings, instructions from recipes where id = %s",
+            (recipe_id,),
+        )
+        r = cur.fetchone()
+        if r is None:
+            raise ValueError(f"recipe {recipe_id} not found")
+        cur.execute(
+            """
+            select i.name, ri.quantity, ri.unit, ri.is_optional
+            from recipe_ingredients ri join ingredients i on i.id = ri.ingredient_id
+            where ri.recipe_id = %s
+            """,
+            (recipe_id,),
+        )
+        ingredients = [
+            {
+                "name": row[0],
+                "quantity": float(row[1]),
+                "unit": row[2],
+                "is_optional": row[3],
+            }
+            for row in cur.fetchall()
+        ]
+    return {
+        "title": r[0],
+        "description": r[1],
+        "cuisine_tags": r[2],
+        "prep_time": r[3],
+        "cook_time": r[4],
+        "default_servings": r[5],
+        "instructions": r[6],
+        "ingredients": ingredients,
     }
 
 
