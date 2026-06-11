@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mise — Direction C: Dark Premium</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#16140F; --surface:#211E18; --surface2:#2A261E; --ink:#F2EBDD; --muted:#9C9384;
+    --line:#332E25; --accent:#D2A24C; --accent-ink:#E8C079; --accent-soft:#2E2616; --good:#8FB07A;
+    --radius:16px; --shadow:0 1px 0 rgba(255,255,255,.02),0 16px 40px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 500px at 50% -10%,#1E1B14,var(--bg));color:var(--ink);
+       font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.45}
+  .wrap{max-width:880px;margin:0 auto;padding:30px 22px 60px}
+  .serif{font-family:"Cormorant Garamond",Georgia,serif}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px}
+  .brand{font-family:"Cormorant Garamond";font-weight:600;font-size:26px;letter-spacing:.02em}
+  .brand .dot{color:var(--accent)}
+  .greet{font-family:"Cormorant Garamond";font-size:40px;font-weight:600;letter-spacing:.01em;margin:0;line-height:1.05}
+  .sub{color:var(--muted);font-size:14px;margin-top:6px;letter-spacing:.01em}
+  .chips{display:flex;gap:8px;align-items:center}
+  .chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:13px;color:var(--ink);font-weight:500}
+  .avatar{width:34px;height:34px;border-radius:999px;background:var(--accent-soft);border:1px solid var(--line);color:var(--accent-ink);
+          display:grid;place-items:center;font-family:"Cormorant Garamond";font-weight:600;font-size:17px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+  .label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:600}
+  .card h3{font-family:"Cormorant Garamond";font-weight:600;font-size:26px;letter-spacing:.01em;margin:8px 0 4px}
+  .meta{color:var(--muted);font-size:14px}
+  .row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .btn{cursor:pointer;font-family:Inter;font-weight:600;font-size:14px;border-radius:10px;padding:10px 16px;border:1px solid transparent}
+  .btn.primary{background:var(--accent);color:#1A1610}
+  .btn.ghost{background:transparent;border-color:var(--line);color:var(--ink)}
+  .btn.small{padding:8px 13px;font-size:13px}
+  .span2{grid-column:1 / -1}
+  .meter{height:8px;border-radius:999px;background:#2C281F;overflow:hidden;margin-top:14px;border:1px solid var(--line)}
+  .meter > i{display:block;height:100%;width:80%;background:linear-gradient(90deg,var(--accent),#e9c785);border-radius:999px}
+  .budget .big{font-family:"Cormorant Garamond";font-size:38px;font-weight:600;margin-top:4px}
+  .ok{color:var(--good);font-weight:600;font-size:13px;margin-top:10px}
+  .alerts ul{margin:8px 0 0;padding:0}
+  .alerts li{list-style:none;display:flex;gap:11px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+  .alerts li:last-child{border-bottom:none}
+  .dotmark{width:7px;height:7px;border-radius:999px;background:var(--accent);flex:none}
+  .quick{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+  .tile{flex:1;min-width:150px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:11px;cursor:pointer}
+  .tile .plus{width:26px;height:26px;border-radius:8px;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-weight:700}
+  @media(max-width:680px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">Mise<span class="dot">.</span></div>
+      <div class="chips"><span class="chip">Home ▾</span><div class="avatar">B</div></div>
+    </header>
+
+    <h1 class="greet">Good evening, Brian</h1>
+    <div class="sub">WEDNESDAY, JUNE 10 · 5-DAY PLAN IN PROGRESS</div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="label">Tonight</div>
+        <h3>Chana Masala</h3>
+        <div class="meta">Dinner · serves 2 · 30 min</div>
+        <div class="row"><button class="btn primary">Cook</button><button class="btn ghost">View recipe</button></div>
+      </div>
+      <div class="card">
+        <div class="label">This week</div>
+        <h3>Jun 10 – 16</h3>
+        <div class="meta">5 dinners planned · 3 cooked, 2 to go</div>
+        <div class="row"><button class="btn ghost small">View plan →</button></div>
+      </div>
+      <div class="card">
+        <div class="label">Shopping</div>
+        <h3>List ready</h3>
+        <div class="meta">12 items · $48 · not purchased yet</div>
+        <div class="row"><button class="btn ghost small">View list →</button></div>
+      </div>
+      <div class="card budget">
+        <div class="label">Budget</div>
+        <div class="big">$48 <span class="meta" style="font-size:15px">of $60</span></div>
+        <div class="meter"><i></i></div>
+        <div class="ok">✓ Under budget</div>
+      </div>
+      <div class="card span2 alerts">
+        <div class="label">Heads up</div>
+        <ul>
+          <li><span class="dotmark"></span> <span><strong>Running low:</strong> rice, yellow onion</span></li>
+          <li><span class="dotmark"></span> <span>Friday's <strong>Black Bean Tacos</strong> needs avocado — not in your pantry</span></li>
+          <li><span class="dotmark"></span> <span><strong>Use soon (est.):</strong> spinach, fresh mozzarella</span></li>
+        </ul>
+        <div class="row"><button class="btn ghost small">Add to pantry</button><button class="btn ghost small">Build shopping list</button></div>
+      </div>
+    </div>
+
+    <div class="quick">
+      <div class="tile"><span class="plus">+</span> Generate a plan</div>
+      <div class="tile"><span class="plus">+</span> Add to pantry</div>
+      <div class="tile"><span class="plus">↗</span> Open shopping list</div>
+    </div>
+  </div>
+</body>
+</html>
