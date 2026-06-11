@@ -21,8 +21,10 @@
 
 ## 1. Principles
 
-- **The plan is the home.** Mise is "what are we eating and what do I buy" — the
-  active week, not a dashboard, is the landing surface.
+- **The dashboard is the home.** An at-a-glance, **action-oriented** overview of
+  the account state — tonight's meal, week progress, shopping status, budget, and
+  ingredient alerts — every card answers a question *and* offers the next step.
+  The full plan is one tap away.
 - **Every async action shows its state.** Loading, empty, and error are designed,
   not afterthoughts. No raw error dumps (the harness's failing).
 - **One primary action per screen.** The user always knows the next step.
@@ -39,43 +41,46 @@ into the structure but hidden until multi-household.)
 
 ```
 Mise
-├── Plan            ← home: the active week, generate/regenerate, per-meal actions
+├── Dashboard       ← HOME: tonight's meal, week summary, shopping status, budget, alerts, quick actions
+├── Plan            ← the full active week; generate/regenerate; per-meal actions
 │   └── Recipe      ← full recipe detail (ingredients, steps, swap/modify/cook)
 ├── Shopping        ← the active plan's list: items, prices vs budget, check off, purchase
 ├── Pantry          ← inventory: add (manual / barcode), edit, what's running low
-├── Recipes         ← (v1.5) saved / past recipes, search  [deferred — see Build Plan]
-└── Settings        ← household, dietary prefs, store/region, account, sign out
-    └── Onboarding  ← first-run: create household → dietary → optional pantry seed
+├── Settings        ← (in header) household, dietary prefs, store/region, pricing tier, account
+│   └── Onboarding  ← first-run: create household → dietary → optional pantry seed
+└── Recipes         ← (v1.5) saved / past recipes, search  [deferred — see Build Plan]
 ```
 
-Auth (sign in / sign up) sits outside the shell.
+The four primary surfaces are **Dashboard · Plan · Shopping · Pantry**. **Settings**
+and the household switcher live in the header (not a tab). Auth sits outside the shell.
 
 ---
 
 ## 3. Navigation Model
 
-- **Mobile:** bottom tab bar — **Plan · Shopping · Pantry · Settings**. Recipe
-  detail and the Generate sheet are pushed/modal over Plan.
+- **Mobile:** bottom tab bar — **Home · Plan · Shopping · Pantry** (4 tabs; the
+  practical max). Recipe detail and the Generate sheet push/modal over the stack.
 - **Web:** the same four as a persistent left sidebar (collapses to a top bar on
   narrow widths). Content area on the right.
-- A small **household chip** in the header (top-right) — shows the current
-  household; becomes a switcher in multi-household (v2).
+- **Settings** is reached from the **account/avatar menu in the header**, not a
+  tab — it's infrequent. The **household chip** (top header) shows the current
+  household and becomes a switcher in multi-household (v2).
 - **State badges** in nav: Shopping shows an item count; Pantry can show a
   "running low" dot.
 
 ```
 WEB SHELL                                   MOBILE SHELL
 ┌────────────┬───────────────────────────┐  ┌───────────────────────────┐
-│ ◆ Mise     │  [household ▾]    [account]│  │ Plan        [household ▾] │
+│ ◆ Mise     │  [household ▾]    [account ▾]  │ Home      [household][◉] │
 │            │                           │  │                           │
-│ ▸ Plan     │                           │  │   (screen content)        │
-│ ▸ Shopping⁵│      (screen content)     │  │                           │
-│ ▸ Pantry • │                           │  │                           │
-│ ▸ Settings │                           │  │                           │
-│            │                           │  ├───────────────────────────┤
-│            │                           │  │ Plan  Shop⁵  Pantry•  Set │
+│ ▸ Home     │                           │  │   (screen content)        │
+│ ▸ Plan     │      (screen content)     │  │                           │
+│ ▸ Shopping⁵│                           │  │                           │
+│ ▸ Pantry • │                           │  ├───────────────────────────┤
+│            │      account ▾ → Settings │  │ Home  Plan  Shop⁵  Pantry•│
 └────────────┴───────────────────────────┘  └───────────────────────────┘
 ```
+(`[◉]` = account/avatar → Settings.)
 
 ---
 
@@ -116,7 +121,54 @@ Step 3 ─ Pantry (optional)  → "Add a few staples, or skip"  [ Skip ] [ Add ]
 - Captures the dietary prefs the generator needs **before** the first plan, so the
   first result is already on-target. Skippable but encouraged.
 
-### 4.3 Plan — empty state (home, no plan yet)
+### 4.3 Dashboard — HOME (overview)
+
+Action-oriented cards. Each states the answer and offers the next step.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Good evening, Brian                   [household ▾] [◉]  │
+│                                                          │
+│  ┌─ Tonight ────────────────┐ ┌─ This week ────────────┐ │
+│  │ 🍛 Chana Masala          │ │ Jun 10–16              │ │
+│  │ Dinner · 2 servings      │ │ 5 dinners · 3 cooked   │ │
+│  │ [ Cook ]   [ View ]      │ │ [ View plan → ]        │ │
+│  └──────────────────────────┘ └────────────────────────┘ │
+│  ┌─ Shopping ───────────────┐ ┌─ Budget ───────────────┐ │
+│  │ Ready · 12 items · $48   │ │ $48 of $60             │ │
+│  │ not purchased            │ │ ▓▓▓▓▓▓▓▓░░  ✓ under     │ │
+│  │ [ View list → ]          │ └────────────────────────┘ │
+│  └──────────────────────────┘                            │
+│  ┌─ Heads up ───────────────────────────────────────────┐│
+│  │ ⚠ Low: rice, yellow onion                            ││
+│  │ ⚠ Fri's Tacos needs avocado — not in your pantry     ││
+│  │ ⏳ Use soon (est.): spinach, mozzarella               ││
+│  │ [ Add to pantry ]  [ Build shopping list ]           ││
+│  └──────────────────────────────────────────────────────┘│
+│  Quick: [ + Generate plan ]  [ + Pantry ]  [ Shopping ]  │
+└──────────────────────────────────────────────────────────┘
+```
+
+Cards (v1): **Tonight/Up-next** (today's meals + one-tap Cook), **This week**
+(plan summary + cook progress), **Shopping** (status → list or "build one"),
+**Budget** (est vs budget meter), **Heads up** (ingredient alerts, below), and
+**Quick actions**. Possible later cards: "recently cooked", a "try this"
+suggestion. **Empty state** (new user, no plan): a prominent "Generate your first
+plan" with a nudge to finish pantry/dietary setup.
+
+**Ingredient alerts** (the "Heads up" card) — three kinds, by data availability:
+- **Running low** — pantry items below a small threshold quantity. *(Have the data.)*
+- **Needed, not stocked** — ingredients the upcoming meals require that aren't in
+  the pantry. Ties the surfaces together; drives the shopping list. *(Have the data.)*
+- **Use soon (estimated)** — a *rough* shelf-life estimate, **not a real expiry**.
+  No external API gives reliable expiry (Open Food Facts / Open Prices / Spoonacular
+  don't carry shelf life). We approximate from the ingredient **category** +
+  `pantry_items.added_at` using a small shelf-life table (seedable from USDA
+  FoodKeeper category defaults), assuming default storage. Always labeled "est."
+  A precise version (storage location, user-set dates, real best-before) is a later,
+  optional enhancement — see §5/Build Plan. *(Lightweight; can ship in v1.)*
+
+### 4.4 Plan — empty state (reached via the Plan tab; dashboard is home)
 
 ```
 ┌───────────────────────────────────────────────────────┐
@@ -130,7 +182,7 @@ Step 3 ─ Pantry (optional)  → "Add a few staples, or skip"  [ Skip ] [ Add ]
 ```
 - One obvious primary action. (Replaces the harness's bare "— select —".)
 
-### 4.4 Generate (sheet / modal over Plan)
+### 4.5 Generate (sheet / modal over Plan)
 
 ```
 ┌──────────────  New plan  ──────────────┐
@@ -151,7 +203,7 @@ Step 3 ─ Pantry (optional)  → "Add a few staples, or skip"  [ Skip ] [ Add ]
 - Dietary pre-filled from Settings; editable per-plan.
 - Non-blocking: the sheet shows live progress, then dismisses to the filled Plan.
 
-### 4.5 Plan — filled (home)
+### 4.6 Plan — filled (the full week)
 
 ```
 ┌───────────────────────────────────────────────────────┐
@@ -176,7 +228,7 @@ Step 3 ─ Pantry (optional)  → "Add a few staples, or skip"  [ Skip ] [ Add ]
 - Budget line is always visible with an over/under indicator.
 - Cooked meals show a clear done state (and the pantry quietly updates).
 
-### 4.6 Recipe detail
+### 4.7 Recipe detail
 
 ```
 ┌───────────────────────────────────────────────────────┐
@@ -196,7 +248,7 @@ Step 3 ─ Pantry (optional)  → "Add a few staples, or skip"  [ Skip ] [ Add ]
 - "Modify…" opens a small prompt ("spicier", "make it vegan") → iterate.
 - "Swap" replaces with a different dish for the slot.
 
-### 4.7 Shopping
+### 4.8 Shopping
 
 ```
 ┌───────────────────────────────────────────────────────┐
@@ -218,7 +270,7 @@ Step 3 ─ Pantry (optional)  → "Add a few staples, or skip"  [ Skip ] [ Add ]
 - Per-item checkbox for in-store use; price shown, "—" when unpriced.
 - "Mark purchased" confirms, then restocks the pantry and shows a success toast.
 
-### 4.8 Pantry
+### 4.9 Pantry
 
 ```
 ┌───────────────────────────────────────────────────────┐
@@ -235,7 +287,7 @@ Step 3 ─ Pantry (optional)  → "Add a few staples, or skip"  [ Skip ] [ Add ]
 - Manual add + barcode (camera on mobile; typed code on web).
 - Inline quantity edit; "running low" affordance feeds future shopping nudges.
 
-### 4.9 Settings
+### 4.10 Settings (from the header account menu)
 
 ```
 ┌───────────────────────────────────────────────────────┐
@@ -304,5 +356,9 @@ Design-led, incremental, each step verifiable:
 6. **Android (Expo)** starts on the same tokens/kit via NativeWind — on-brand from
    the first screen, not catching up.
 
-Deferred: **Recipes** browse/search surface (v1.5), recipe **images** (needs an
-image source — decide in the visual pass), multi-household switcher (v2).
+Dashboard alerts in v1: **running low** + **needed-not-stocked** (have the data) and
+a **lightweight "use soon" estimate** (category shelf-life + `added_at`; needs a small
+seedable shelf-life table — bounded). Deferred: **Recipes** browse/search (v1.5),
+recipe **images** (needs an image source — decide in the visual pass), **precise
+expiry** (storage location, user-set/scanned best-before dates), multi-household
+switcher (v2).
