@@ -188,7 +188,13 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      `POST /v1/households/{id}/pantry/add-barcode` (resolve → canonicalize → upsert pantry). Web
      has a barcode input in the pantry section (the camera scan is a mobile feature later).
      **Verified live**: `3017620422003` → "Nutella" → added to pantry. 43 tests pass.
-   - TODO next: token-cost benchmark (AI_LAYER §11), Android, then mobile barcode camera scan.
+   - ✅ Token-cost benchmark (branch `feat/token-benchmark`, AI_LAYER §11): `scripts/benchmark.py`
+     runs representative profiles through real generation and computes $/run. **Results recorded
+     in AI_LAYER §11**: blended ≈ **$0.093/generation** → free tier (≤5/mo) ≈ **$0.47/user/month**
+     (comfortable; a ~5/mo cap is safe). Output tokens dominate. Finding: prompt caching is a
+     no-op today (stable prefix < Sonnet's 2048 cache min + parallel calls fire concurrently).
+   - TODO next: Android (Expo) + mobile barcode camera scan; per-household price calibration;
+     sign-out-on-auth-error polish; entitlement gating for paid pricing tiers (with billing).
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 
