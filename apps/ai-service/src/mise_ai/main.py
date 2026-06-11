@@ -39,6 +39,7 @@ from .db import (
     set_job_status,
     swap_meal_recipe,
 )
+from .dashboard import build_dashboard
 from .generation import GenerationError, generate_meal_plan, generate_recipe
 from .openfoodfacts import lookup_product
 from .pantry import cook_meal
@@ -159,6 +160,17 @@ def add_pantry_barcode(
         quantity=req.quantity,
         unit=req.unit.value,
     )
+
+
+@app.get("/v1/households/{household_id}/dashboard")
+def dashboard(
+    household_id: UUID, user: UUID | None = Depends(current_user)
+) -> dict[str, Any]:
+    """Home-dashboard read model (UX_DESIGN.md): current plan summary, upcoming
+    meals, and ingredient alerts (use-soon / running-low / needed-not-stocked)."""
+    with connect() as conn:
+        require_membership(conn, user, household_id)
+        return build_dashboard(conn, household_id)
 
 
 @app.get("/v1/households/{household_id}/latest-plan")

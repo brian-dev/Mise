@@ -10,6 +10,7 @@ NEVER enable test mode in production (these mutate/delete data freely).
 
 from __future__ import annotations
 
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -38,10 +39,14 @@ class SeedResponse(BaseModel):
 
 
 def _deterministic_plan(household_id: UUID) -> tuple[MealPlanRequest, GeneratedMealPlan]:
+    # Date the plan starting today so the meal is "upcoming" on the dashboard
+    # (which only surfaces uncooked meals from today forward). Deterministic in
+    # content, just not in calendar date.
+    today = date.today()
     req = MealPlanRequest(
         household_id=household_id,
-        start_date="2026-06-10",  # type: ignore[arg-type]
-        end_date="2026-06-10",  # type: ignore[arg-type]
+        start_date=today,
+        end_date=today,
         household_size=2,
         meal_types=[MealType.dinner],
         budget=40,
@@ -49,7 +54,7 @@ def _deterministic_plan(household_id: UUID) -> tuple[MealPlanRequest, GeneratedM
     plan = GeneratedMealPlan(
         days=[
             GeneratedDay(
-                date="2026-06-10",  # type: ignore[arg-type]
+                date=today,
                 meals=[
                     GeneratedMeal(
                         meal_type=MealType.dinner,
