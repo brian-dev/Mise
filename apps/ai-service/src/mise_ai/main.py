@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from .auth import current_user, require_membership
 from .config import settings
 from .db import (
+    add_to_pantry,
     connect,
     create_generation_job,
     create_household,
@@ -39,6 +40,7 @@ from .db import (
     swap_meal_recipe,
 )
 from .generation import GenerationError, generate_meal_plan, generate_recipe
+from .openfoodfacts import lookup_product
 from .pantry import cook_meal
 from .pricing import PricingError, PricingItem, resolve_prices
 from .schemas import Dietary, MealPlanRequest, PantryItem, RecipeRequest, Unit
@@ -100,6 +102,63 @@ def pantry(
     with connect() as conn:
         require_membership(conn, user, household_id)
         return get_pantry(conn, household_id)
+
+
+class ProductResponse(BaseModel):
+    barcode: str
+    name: str
+    brand: str | None
+    quantity: str | None
+    price: Decimal | None  # USD from Open Prices, if available
+
+
+@app.get("/v1/products/{barcode}", response_model=ProductResponse)
+def product(barcode: str, user: UUID | None = Depends(current_user)) -> ProductResponse:
+    """Resolve a scanned barcode to a product (Open Food Facts) + crowd price
+    (Open Prices, USD if available). Auth only; not household-scoped."""
+    p = lookup_product(barcode)
+    if p is None:
+        raise HTTPException(status_code=404, detail=f"no product for barcode {barcode}")
+    return ProductResponse(
+        barcode=p.barcode, name=p.name, brand=p.brand, quantity=p.quantity, price=p.price
+    )
+
+
+class AddBarcodeRequest(BaseModel):
+    barcode: str
+    quantity: Decimal = Decimal("1")
+    unit: Unit = Unit.unit
+
+
+class AddBarcodeResponse(BaseModel):
+    ingredient_id: UUID
+    name: str
+    quantity: Decimal
+    unit: str
+
+
+@app.post("/v1/households/{household_id}/pantry/add-barcode", response_model=AddBarcodeResponse)
+def add_pantry_barcode(
+    household_id: UUID,
+    req: AddBarcodeRequest,
+    user: UUID | None = Depends(current_user),
+) -> AddBarcodeResponse:
+    """Scan-to-pantry (spec §3.4): resolve the barcode to a product name, add it to
+    the household pantry as a canonicalized ingredient."""
+    with connect() as conn:
+        require_membership(conn, user, household_id)
+        p = lookup_product(req.barcode)
+        if p is None:
+            raise HTTPException(
+                status_code=404, detail=f"no product for barcode {req.barcode}"
+            )
+        result = add_to_pantry(conn, household_id, p.name, req.quantity, req.unit.value)
+    return AddBarcodeResponse(
+        ingredient_id=result["ingredient_id"],
+        name=result["name"],
+        quantity=req.quantity,
+        unit=req.unit.value,
+    )
 
 
 @app.get("/v1/households/{household_id}/latest-plan")
