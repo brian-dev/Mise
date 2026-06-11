@@ -373,14 +373,26 @@ Compare against the Free→Personal upsell economics (spec §6.1). If
 `free_tier_monthly_cost` is uncomfortable, the levers are: Haiku for the plan path,
 shorter default plan length, or tightening the free limit below 5.
 
-**Table to fill (post-implementation):**
+**Results (2026-06, `claude-sonnet-4-6`, parallel per-day on).** Run
+`apps/ai-service/scripts/benchmark.py` to reproduce. Input/output are total tokens
+across the (parallel) calls for the plan; $/run uses Sonnet rates ($3 in / $15 out per 1M,
+cache write 1.25×, read 0.1×):
 
-| Profile | Days | Meals/day | Diet | Model | Input (cached/uncached) | Output | $/run |
-|---|---|---|---|---|---|---|---|
-| _tbd_ | | | | | | | |
+| Profile | Days | Meals/day | Input | Output | $/run |
+|---|---|---|---|---|---|
+| 1-day dinner | 1 | 1 | 1,584 | 855 | $0.018 |
+| 3-day dinner (veg) | 3 | 1 | 4,782 | 3,205 | $0.062 |
+| 7-day dinner | 7 | 1 | 11,095 | 8,675 | $0.163 |
+| 3-day all meals | 3 | 3 | 4,785 | 7,636 | $0.129 |
 
-This benchmark is a deliverable of the first AI-service implementation PR, not of this
-design.
+- **Blended ≈ $0.093 / generation** → free tier (≤5/mo) ≈ **$0.47 / user / month**. Comfortable
+  vs. the Free→Personal economics — a ~5/month free cap is safe; we could even raise it.
+- **Output tokens dominate** cost (full recipes inline). The cheapest lever if needed is a
+  shorter default plan length or Haiku for the plan path.
+- **Prompt caching is currently a no-op** here (`cache_creation`/`cache_read` = 0): the stable
+  system+tool prefix is under Sonnet's 2048-token cache minimum, **and** parallel per-day calls
+  fire concurrently so they can't read each other's cache write anyway (skill's concurrent-request
+  caveat). Not worth chasing at these costs; revisit if the prefix grows or volume spikes.
 
 ---
 
