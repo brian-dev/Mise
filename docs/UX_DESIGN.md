@@ -16,6 +16,7 @@
 5. [Cross-cutting UX Conventions](#5-cross-cutting-ux-conventions)
 6. [Component Inventory (for the kit)](#6-component-inventory-for-the-kit)
 7. [Build Plan](#7-build-plan)
+8. [Theming & Recipe Images](#8-theming--recipe-images)
 
 ---
 
@@ -292,6 +293,7 @@ plan" with a nudge to finish pantry/dietary setup.
 ```
 ┌───────────────────────────────────────────────────────┐
 │  Settings                                               │
+│  Theme       ( Warm Editorial ▾ )   ○ Light  ● …        │  ← theme switcher
 │  Household   ( Home________ )                           │
 │  Dietary     [veg ✕] [+ add]    Avoid (no mushrooms___) │
 │  Store       ( HEB____ )   Region ( Texas )             │
@@ -299,6 +301,7 @@ plan" with a nudge to finish pantry/dietary setup.
 │  Account     brian@…             [ Sign out ]           │
 └───────────────────────────────────────────────────────┘
 ```
+- **Theme switcher** (see §8) — default Warm Editorial; users pick others.
 - Dietary lives here (defaults every generation) and is overridable per-plan.
 - Store/region feed pricing; the pricing tier is surfaced for the eventual upgrade.
 
@@ -344,21 +347,50 @@ The shared kit we'll build to the tokens (web first, mirrored on mobile):
 
 Design-led, incremental, each step verifiable:
 
-1. **Approve this IA + wireframes** (this doc).
-2. **Visual direction:** I propose 2–3 aesthetic directions (palette + type + one
-   rendered screen) to react to → pick one.
-3. **Design tokens** package (`packages/design` or under `@mise/shared`): color,
-   type, spacing, radius, shadow, motion — consumed by web (Tailwind) + mobile
-   (NativeWind).
-4. **Component kit** on web, built to tokens.
-5. **Rebuild web screens** on the kit, screen by screen (Plan → Shopping → Pantry
-   → Settings → Recipe), replacing the harness. Keep the test hooks + `data-testid`.
+1. ✅ **IA + wireframes** approved (this doc).
+2. ✅ **Visual direction chosen:** **Warm Editorial (A)** as the default, with
+   user-selectable **themes** enabled from the start; recipe **images via Pexels**
+   (see §8). Mockups in `docs/mockups/`.
+3. **Design tokens** package, **theme-aware** (`packages/design` or under
+   `@mise/shared`): color, type, spacing, radius, shadow, motion — defined per
+   theme, consumed by web (Tailwind/CSS vars) + mobile (NativeWind). Ship
+   **Warm Editorial** as the default theme.
+4. **Component kit** on web, built to tokens (theme-agnostic).
+5. **Rebuild web screens** on the kit, screen by screen (Dashboard → Plan →
+   Shopping → Pantry → Settings → Recipe), replacing the harness. Keep the test
+   hooks + `data-testid`. Add the **theme switcher** + **recipe images**.
 6. **Android (Expo)** starts on the same tokens/kit via NativeWind — on-brand from
    the first screen, not catching up.
 
 Dashboard alerts in v1: **running low** + **needed-not-stocked** (have the data) and
 a **lightweight "use soon" estimate** (category shelf-life + `added_at`; needs a small
 seedable shelf-life table — bounded). Deferred: **Recipes** browse/search (v1.5),
-recipe **images** (needs an image source — decide in the visual pass), **precise
-expiry** (storage location, user-set/scanned best-before dates), multi-household
-switcher (v2).
+**precise expiry** (storage location, user-set/scanned best-before dates),
+multi-household switcher (v2), AI-generated exact recipe images (paid upgrade).
+
+---
+
+## 8. Theming & Recipe Images
+
+### Theming (decided)
+- **Default:** **Warm Editorial** (direction A — cream, Fraunces serif, terracotta).
+- **User-selectable themes** from day one: tokens are defined **per theme**;
+  switching themes swaps the active token set (a `data-theme` attribute / context
+  on web, the same tokens via NativeWind on mobile) — **no component changes**.
+  Likely starter set: Warm Editorial (default), a **Dark** theme (direction C —
+  charcoal + gold), and **Modern Fresh** (direction B). Light/dark are just themes.
+- **Where it lives:** a theme switcher in **Settings**; the choice persists on the
+  user profile. Build the token layer theme-aware up front so themes aren't a
+  retrofit.
+
+### Recipe images (decided — cheapest good source)
+- **Source: Pexels API** (free, generous quota, no attribution requirement) — the
+  cheapest path that still looks premium. Search by recipe **title** → fall back to
+  **cuisine** → fall back to a tasteful category placeholder.
+- **Representative, not exact:** a stock photo of *the kind of dish*, not a render
+  of our specific recipe. Acceptable for the cheapest tier; exact **AI-generated**
+  images are a paid upgrade later.
+- **Persisted:** store the chosen URL on the recipe (small `recipes.image_url`
+  migration) so it's stable and we don't re-query Pexels each view.
+- **Needs** a free `PEXELS_API_KEY` (like the other integrations); degrades to the
+  placeholder when absent or no good match.
