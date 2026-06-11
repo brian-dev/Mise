@@ -110,6 +110,11 @@ export const api = {
   createHousehold: (name: string) =>
     req<Household>("/v1/households", { method: "POST", body: JSON.stringify({ name }) }),
   getPantry: (id: string) => req<PantryItem[]>(`/v1/households/${id}/pantry`),
+  addByBarcode: (householdId: string, barcode: string) =>
+    req<{ name: string; quantity: string; unit: string }>(
+      `/v1/households/${householdId}/pantry/add-barcode`,
+      { method: "POST", body: JSON.stringify({ barcode }) },
+    ),
   generate: (body: GenerateRequest) =>
     req<JobAccepted>("/v1/meal-plans/generate", {
       method: "POST",

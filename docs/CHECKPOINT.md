@@ -182,7 +182,13 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      reconstructs the emitted recipe shape (ingredient names). Web "Modify" button per meal (prompts
      for the change). **Verified live**: "make it vegan" on Margherita Pizza → Vegan Margherita with
      cashew ricotta. 39 tests pass.
-   - TODO next: Open Prices / barcode pantry, token-cost benchmark (AI_LAYER §11), Android.
+   - ✅ Barcode pantry + Open Prices (branch `feat/barcode-pantry`, spec §3.4): `openfoodfacts.py`
+     resolves a barcode to a product via **Open Food Facts** (free) and a USD crowd price via
+     **Open Prices** (filtered to USD; null otherwise). `GET /v1/products/{barcode}` and
+     `POST /v1/households/{id}/pantry/add-barcode` (resolve → canonicalize → upsert pantry). Web
+     has a barcode input in the pantry section (the camera scan is a mobile feature later).
+     **Verified live**: `3017620422003` → "Nutella" → added to pantry. 43 tests pass.
+   - TODO next: token-cost benchmark (AI_LAYER §11), Android, then mobile barcode camera scan.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

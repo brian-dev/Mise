@@ -34,6 +34,7 @@ function Home({ email }: { email?: string }) {
   const [householdId, setHouseholdId] = useState<string>("");
   const [newName, setNewName] = useState("");
   const [pantry, setPantry] = useState<PantryItem[]>([]);
+  const [barcode, setBarcode] = useState("");
 
   // Generation form
   const [startDate, setStartDate] = useState("2026-06-10");
@@ -84,6 +85,14 @@ function Home({ email }: { email?: string }) {
       setBusy(null);
     }
   }
+
+  const addBarcode = () =>
+    run("barcode", async () => {
+      if (!householdId || !barcode.trim()) return;
+      await api.addByBarcode(householdId, barcode.trim());
+      setBarcode("");
+      await refreshPantry(householdId);
+    });
 
   const createHousehold = () =>
     run("household", async () => {
@@ -220,6 +229,23 @@ function Home({ email }: { email?: string }) {
                 ))}
               </ul>
             )}
+            <div style={{ marginTop: 6 }}>
+              <input
+                data-testid="barcode-input"
+                placeholder="barcode (e.g. 3017620422003)"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                style={{ padding: 6, width: 220 }}
+              />
+              <button
+                data-testid="barcode-add"
+                onClick={addBarcode}
+                disabled={busy === "barcode" || !barcode.trim()}
+                style={{ marginLeft: 8 }}
+              >
+                {busy === "barcode" ? "Adding…" : "Add by barcode"}
+              </button>
+            </div>
           </div>
         )}
       </section>

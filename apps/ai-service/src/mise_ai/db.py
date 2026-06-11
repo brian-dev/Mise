@@ -9,6 +9,7 @@ unique constraint.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
@@ -198,6 +199,31 @@ def swap_meal_recipe(
         recipe_id = _persist_recipe(cur, recipe)
         cur.execute("update meals set recipe_id = %s where id = %s", (recipe_id, meal_id))
     return recipe_id
+
+
+def add_to_pantry(
+    conn: psycopg.Connection,
+    household_id: UUID,
+    ingredient_name: str,
+    quantity: Decimal,
+    unit: str,
+) -> dict[str, Any]:
+    """Canonicalize the ingredient and add the quantity to the household pantry
+    (upsert by ingredient+unit). Returns the resolved ingredient."""
+    with conn.transaction(), conn.cursor() as cur:
+        ingredient_id = canonicalize_ingredient(cur, ingredient_name, None)
+        cur.execute(
+            """
+            insert into pantry_items (household_id, ingredient_id, quantity, unit)
+            values (%s, %s, %s, %s)
+            on conflict (household_id, ingredient_id, unit)
+            do update set quantity = pantry_items.quantity + excluded.quantity
+            """,
+            (household_id, ingredient_id, quantity, unit),
+        )
+        cur.execute("select name from ingredients where id = %s", (ingredient_id,))
+        name: str = cur.fetchone()[0]  # type: ignore[index]
+    return {"ingredient_id": ingredient_id, "name": name}
 
 
 def get_pantry(conn: psycopg.Connection, household_id: UUID) -> list[dict[str, Any]]:
