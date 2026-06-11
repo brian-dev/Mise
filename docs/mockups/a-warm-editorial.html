@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mise — Direction A: Warm Editorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#F6F1E7; --surface:#FFFDF8; --ink:#2B2722; --muted:#857C6E;
+    --line:#E7DECE; --accent:#C0532F; --accent-soft:#F0DDCF; --good:#5E7B53;
+    --radius:16px; --shadow:0 1px 2px rgba(43,39,34,.04),0 8px 24px rgba(43,39,34,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;
+       -webkit-font-smoothing:antialiased;line-height:1.45}
+  .wrap{max-width:880px;margin:0 auto;padding:28px 22px 60px}
+  .display{font-family:Fraunces,Georgia,serif}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+  .brand{font-family:Fraunces,serif;font-weight:600;font-size:22px;letter-spacing:-.01em}
+  .brand .dot{color:var(--accent)}
+  .hgroup .greet{font-family:Fraunces,serif;font-size:32px;font-weight:500;letter-spacing:-.02em;margin:0}
+  .hgroup .sub{color:var(--muted);font-size:14px;margin-top:2px}
+  .chips{display:flex;gap:8px;align-items:center}
+  .chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;
+        padding:7px 13px;font-size:13px;color:var(--ink);font-weight:500}
+  .avatar{width:34px;height:34px;border-radius:999px;background:var(--accent-soft);
+          border:1px solid var(--line);display:grid;place-items:center;font-family:Fraunces,serif;color:var(--accent);font-weight:600}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+        padding:20px;box-shadow:var(--shadow)}
+  .card .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .card h3{font-family:Fraunces,serif;font-weight:600;font-size:21px;letter-spacing:-.01em;margin:8px 0 4px}
+  .meta{color:var(--muted);font-size:14px}
+  .row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .btn{border:none;cursor:pointer;font-family:Inter;font-weight:600;font-size:14px;border-radius:10px;padding:10px 16px}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn.small{padding:8px 13px;font-size:13px}
+  .span2{grid-column:1 / -1}
+  .meter{height:9px;border-radius:999px;background:var(--accent-soft);overflow:hidden;margin-top:12px}
+  .meter > i{display:block;height:100%;width:80%;background:var(--good);border-radius:999px}
+  .budget .big{font-family:Fraunces,serif;font-size:30px;font-weight:600;margin-top:6px}
+  .budget .ok{color:var(--good);font-weight:600;font-size:13px}
+  .alerts li{list-style:none;padding:10px 0;border-bottom:1px dashed var(--line);font-size:14.5px;display:flex;gap:10px}
+  .alerts li:last-child{border-bottom:none}
+  .alerts .ic{color:var(--accent)}
+  .alerts ul{margin:6px 0 0;padding:0}
+  .quick{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .tile{flex:1;min-width:150px;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+        padding:16px;font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:10px;cursor:pointer}
+  .tile .plus{width:26px;height:26px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700}
+  @media(max-width:680px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">Mise<span class="dot">.</span></div>
+      <div class="chips">
+        <span class="chip">Home ▾</span>
+        <div class="avatar">B</div>
+      </div>
+    </header>
+
+    <div class="hgroup">
+      <h1 class="greet">Good evening, Brian</h1>
+      <div class="sub">Wednesday, June 10 · 5-day plan in progress</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="label">Tonight</div>
+        <h3>Chana Masala</h3>
+        <div class="meta">Dinner · serves 2 · 30 min</div>
+        <div class="row">
+          <button class="btn primary">Cook</button>
+          <button class="btn ghost">View recipe</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label">This week</div>
+        <h3>Jun 10 – 16</h3>
+        <div class="meta">5 dinners planned · 3 cooked, 2 to go</div>
+        <div class="row"><button class="btn ghost small">View plan →</button></div>
+      </div>
+
+      <div class="card">
+        <div class="label">Shopping</div>
+        <h3>List ready</h3>
+        <div class="meta">12 items · $48 · not purchased yet</div>
+        <div class="row"><button class="btn ghost small">View list →</button></div>
+      </div>
+
+      <div class="card budget">
+        <div class="label">Budget</div>
+        <div class="big">$48 <span class="meta" style="font-size:15px">of $60</span></div>
+        <div class="meter"><i></i></div>
+        <div class="ok" style="margin-top:8px">✓ Under budget</div>
+      </div>
+
+      <div class="card span2 alerts">
+        <div class="label">Heads up</div>
+        <ul>
+          <li><span class="ic">▢</span> <span><strong>Running low:</strong> rice, yellow onion</span></li>
+          <li><span class="ic">＋</span> <span>Friday's <strong>Black Bean Tacos</strong> needs avocado — not in your pantry</span></li>
+          <li><span class="ic">⏳</span> <span><strong>Use soon (est.):</strong> spinach, fresh mozzarella</span></li>
+        </ul>
+        <div class="row">
+          <button class="btn ghost small">Add to pantry</button>
+          <button class="btn ghost small">Build shopping list</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="quick">
+      <div class="tile"><span class="plus">+</span> Generate a plan</div>
+      <div class="tile"><span class="plus">+</span> Add to pantry</div>
+      <div class="tile"><span class="plus">↗</span> Open shopping list</div>
+    </div>
+  </div>
+</body>
+</html>
