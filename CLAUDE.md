@@ -64,7 +64,7 @@ unchanged by the test run.
 
 ## Orientation
 - Start a session by reading `docs/CHECKPOINT.md` — it points to the current state and the
-  other design docs (`PRODUCT_SPEC.md`, `ARCHITECTURE.md`, `AI_LAYER.md`).
+  other design docs (`PRODUCT_SPEC.md`, `ARCHITECTURE.md`, `AI_LAYER.md`, `UX_DESIGN.md`).
 
 ## Toolchain
 - JS: pnpm (via corepack) + Turborepo. Run tasks with `pnpm exec turbo run <task>`.
