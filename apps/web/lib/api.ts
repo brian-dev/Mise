@@ -143,4 +143,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ modify: modify ?? null }),
     }),
+  iterateMeal: (mealId: string, modify: string) =>
+    req<{ title: string }>(`/v1/meals/${mealId}/iterate`, {
+      method: "POST",
+      body: JSON.stringify({ modify }),
+    }),
 };

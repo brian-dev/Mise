@@ -8,6 +8,7 @@ import pytest
 
 from mise_ai.db import (
     create_household,
+    get_recipe_for_prompt,
     meal_swap_context,
     persist_meal_plan,
     swap_meal_recipe,
@@ -108,3 +109,64 @@ def test_live_generate_recipe() -> None:
     assert result.recipe.title
     assert result.recipe.ingredients
     assert result.usage and result.usage[0].output_tokens > 0
+
+
+@pytest.mark.db
+def test_get_recipe_for_prompt_roundtrips(conn: psycopg.Connection) -> None:
+    """The recipe loader reconstructs the emitted shape (ingredient names) for use
+    as the iterate base."""
+    household_id = create_household(conn, "Iter HH")["id"]
+    req = MealPlanRequest(
+        household_id=household_id,
+        start_date="2026-06-10",  # type: ignore[arg-type]
+        end_date="2026-06-10",  # type: ignore[arg-type]
+        household_size=2,
+        meal_types=[MealType.dinner],
+    )
+    recipe = GeneratedRecipe(
+        title="Chili",
+        cuisine_tags=["american"],
+        default_servings=2,
+        instructions="Simmer.",
+        ingredients=[
+            GeneratedIngredient(name="yellow onion", quantity=1, unit=Unit.lb),
+            GeneratedIngredient(name="kidney bean", quantity=2, unit=Unit.can),
+        ],
+    )
+    plan = GeneratedMealPlan(
+        days=[
+            GeneratedDay(
+                date="2026-06-10",  # type: ignore[arg-type]
+                meals=[GeneratedMeal(meal_type=MealType.dinner, servings=2, recipe=recipe)],
+            )
+        ]
+    )
+    meal_plan_id = persist_meal_plan(conn, plan, req)
+    with conn.cursor() as cur:
+        cur.execute(
+            "select m.id from meals m join meal_plan_days d on d.id = m.meal_plan_day_id "
+            "where d.meal_plan_id = %s",
+            (meal_plan_id,),
+        )
+        meal_id = cur.fetchone()[0]  # type: ignore[index]
+
+    ctx = meal_swap_context(conn, meal_id)
+    base = get_recipe_for_prompt(conn, ctx["recipe_id"])
+    assert base["title"] == "Chili"
+    assert base["default_servings"] == 2
+    names = sorted(i["name"].lower() for i in base["ingredients"])
+    assert names == ["kidney bean", "yellow onion"]
+
+
+@pytest.mark.live
+def test_live_iterate_recipe() -> None:
+    base = {
+        "title": "Margherita Pizza",
+        "cuisine_tags": ["Italian"],
+        "default_servings": 2,
+        "instructions": "Top dough with tomato, mozzarella, basil; bake.",
+        "ingredients": [{"name": "pizza dough", "quantity": 1, "unit": "unit"}],
+    }
+    req = RecipeRequest(meal_type=MealType.dinner, servings=2, modify="make it vegan")
+    result = generate_recipe(req, base_recipe=base)
+    assert result.recipe.title and result.recipe.ingredients

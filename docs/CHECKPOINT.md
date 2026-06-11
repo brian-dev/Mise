@@ -176,8 +176,13 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      days stay distinct (independent calls otherwise converge — saw 3 near-identical meals
      without it). **Verified live**: 3-day plan 31s→~20s (~1.6x) with good variety
      (Italian→Mexican→Indian). 38 tests pass.
-   - TODO next: recipe *iterate*, Open Prices / barcode pantry, token-cost benchmark
-     (AI_LAYER §11), Android.
+   - ✅ Recipe iterate (branch `feat/recipe-iterate`, AI_LAYER §8): `POST /v1/meals/{id}/iterate`
+     {modify} loads the meal's current recipe as the base, generates a *variant* of it (keeps the
+     dish's essence, unlike swap which replaces), and points the meal at it. `db.get_recipe_for_prompt`
+     reconstructs the emitted recipe shape (ingredient names). Web "Modify" button per meal (prompts
+     for the change). **Verified live**: "make it vegan" on Margherita Pizza → Vegan Margherita with
+     cashew ricotta. 39 tests pass.
+   - TODO next: Open Prices / barcode pantry, token-cost benchmark (AI_LAYER §11), Android.
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
 

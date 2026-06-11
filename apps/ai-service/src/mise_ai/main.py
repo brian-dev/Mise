@@ -26,6 +26,7 @@ from .db import (
     get_job,
     get_meal_plan,
     get_pantry,
+    get_recipe_for_prompt,
     get_shopping_list,
     household_for_meal,
     household_for_meal_plan,
@@ -446,6 +447,51 @@ def swap(
         )
         try:
             result = generate_recipe(recipe_req)
+        except GenerationError as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
+        recipe_id = swap_meal_recipe(conn, meal_id, result.recipe)
+
+    return SwapResponse(
+        meal_id=meal_id,
+        recipe_id=recipe_id,
+        title=result.recipe.title,
+        cuisine_tags=result.recipe.cuisine_tags,
+    )
+
+
+class IterateRequest(BaseModel):
+    modify: str  # required — how to change the dish ("spicier", "make it vegan")
+    dietary: Dietary | None = None
+
+
+@app.post("/v1/meals/{meal_id}/iterate", response_model=SwapResponse)
+def iterate(
+    meal_id: UUID, req: IterateRequest, user: UUID | None = Depends(current_user)
+) -> SwapResponse:
+    """Produce a *variant* of the meal's current recipe per `modify` (AI_LAYER §8) —
+    keeps the dish's essence, unlike swap which replaces it. Points the meal at the
+    new recipe."""
+    with connect() as conn:
+        try:
+            ctx = meal_swap_context(conn, meal_id)
+            base_recipe = get_recipe_for_prompt(conn, ctx["recipe_id"])
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        require_membership(conn, user, ctx["household_id"])
+        pantry = [
+            PantryItem(name=p["name"], quantity=float(p["quantity"]), unit=Unit(p["unit"]))
+            for p in get_pantry(conn, ctx["household_id"])
+        ]
+        recipe_req = RecipeRequest(
+            meal_type=ctx["meal_type"],
+            servings=ctx["servings"],
+            dietary=(req.dietary if req.dietary else Dietary()),
+            pantry=pantry,
+            avoid_titles=ctx["avoid_titles"],
+            modify=req.modify,
+        )
+        try:
+            result = generate_recipe(recipe_req, base_recipe=base_recipe)
         except GenerationError as e:
             raise HTTPException(status_code=502, detail=str(e)) from e
         recipe_id = swap_meal_recipe(conn, meal_id, result.recipe)
