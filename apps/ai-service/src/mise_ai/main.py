@@ -16,7 +16,7 @@ from uuid import UUID
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .auth import current_user, require_membership
 from .config import settings
@@ -26,6 +26,8 @@ from .db import (
     create_generation_job,
     create_household,
     get_job,
+    get_current_consents,
+    get_household_profile,
     get_meal_plan,
     get_pantry,
     get_recipe_detail,
@@ -39,11 +41,14 @@ from .db import (
     household_for_shopping_list,
     latest_meal_plan_id,
     list_households,
+    log_event,
     meal_swap_context,
     persist_meal_plan,
+    record_consent,
     recipes_missing_image_for_plan,
     set_job_status,
     swap_meal_recipe,
+    update_household_profile,
 )
 from .dashboard import build_dashboard
 from .generation import GenerationError, generate_meal_plan, generate_recipe
@@ -121,6 +126,128 @@ def put_theme(
     with connect() as conn:
         set_user_theme(conn, user, req.theme)
     return ThemeResponse(theme=req.theme)
+
+
+# --------------------------------------------------------------------------- #
+# Onboarding: household profile, consent ledger, analytics events.
+# --------------------------------------------------------------------------- #
+_CONSENT_KINDS = {"personalization", "analytics", "data_sharing", "marketing"}
+
+
+class HouseholdProfile(BaseModel):
+    # All optional — the onboarding wizard fills these progressively.
+    household_size: int | None = Field(default=None, ge=1)
+    weekly_budget: Decimal | None = None
+    preferred_cuisines: list[str] | None = None
+    preferred_meal_types: list[str] | None = None
+    cooking_time: str | None = None
+    dietary_flags: list[str] | None = None
+    avoid_text: str | None = None
+    region: str | None = None
+    store_preference: str | None = None
+
+
+class HouseholdProfileOut(HouseholdProfile):
+    name: str
+    onboarding_completed_at: str | None = None
+
+
+class ProfileUpdate(HouseholdProfile):
+    # Stamp onboarding_completed_at when the wizard finishes.
+    complete_onboarding: bool = False
+
+
+@app.get("/v1/households/{household_id}/profile", response_model=HouseholdProfileOut)
+def get_profile(
+    household_id: UUID, user: UUID | None = Depends(current_user)
+) -> HouseholdProfileOut:
+    with connect() as conn:
+        require_membership(conn, user, household_id)
+        try:
+            p = get_household_profile(conn, household_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+    completed = p.pop("onboarding_completed_at")
+    return HouseholdProfileOut(
+        **p, onboarding_completed_at=completed.isoformat() if completed else None
+    )
+
+
+@app.put("/v1/households/{household_id}/profile", status_code=204)
+def put_profile(
+    household_id: UUID, req: ProfileUpdate, user: UUID | None = Depends(current_user)
+) -> None:
+    """Persist the household onboarding snapshot. Only provided fields are written;
+    `complete_onboarding` stamps completion and logs the event."""
+    fields = req.model_dump(exclude={"complete_onboarding"}, exclude_none=True)
+    with connect() as conn:
+        require_membership(conn, user, household_id)
+        update_household_profile(
+            conn, household_id, fields, complete_onboarding=req.complete_onboarding
+        )
+        if req.complete_onboarding:
+            log_event(
+                conn,
+                "onboarding_completed",
+                user_id=user,
+                household_id=household_id,
+                properties={"fields": sorted(fields.keys())},
+            )
+
+
+class ConsentDecision(BaseModel):
+    kind: str
+    granted: bool
+
+
+class ConsentUpdate(BaseModel):
+    version: str
+    decisions: list[ConsentDecision]
+
+
+@app.get("/v1/me/consents")
+def get_consents(user: UUID | None = Depends(current_user)) -> dict[str, bool]:
+    if user is None:
+        return {}
+    with connect() as conn:
+        return get_current_consents(conn, user)
+
+
+@app.post("/v1/me/consents", status_code=204)
+def post_consents(
+    req: ConsentUpdate, user: UUID | None = Depends(current_user)
+) -> None:
+    """Append consent decisions to the ledger (one row each, history-preserving)."""
+    if user is None:
+        raise HTTPException(status_code=401, detail="authentication required")
+    unknown = {d.kind for d in req.decisions} - _CONSENT_KINDS
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"unknown consent kind(s): {unknown}")
+    with connect() as conn:
+        for d in req.decisions:
+            record_consent(conn, user, d.kind, d.granted, req.version)
+
+
+class EventIn(BaseModel):
+    event_type: str
+    household_id: UUID | None = None
+    properties: dict[str, Any] = Field(default_factory=dict)
+
+
+@app.post("/v1/events", status_code=204)
+def post_event(req: EventIn, user: UUID | None = Depends(current_user)) -> None:
+    """Client-emitted analytics event. Auth-scoped; household membership checked
+    when a household is named so callers can't attribute events elsewhere."""
+    with connect() as conn:
+        if req.household_id is not None:
+            require_membership(conn, user, req.household_id)
+        log_event(
+            conn,
+            req.event_type,
+            user_id=user,
+            household_id=req.household_id,
+            properties=req.properties,
+        )
 
 
 @app.get("/v1/households")
@@ -348,6 +475,24 @@ def _run_meal_plan_job(job_id: UUID, req: MealPlanRequest) -> None:
         # first load. Never let this fail the job.
         try:
             _populate_plan_images(meal_plan_id)
+        except Exception:  # noqa: BLE001
+            pass
+        # Best-effort analytics: record that a plan was generated.
+        try:
+            days = (req.end_date - req.start_date).days + 1
+            with connect() as conn:
+                log_event(
+                    conn,
+                    "plan_generated",
+                    household_id=req.household_id,
+                    properties={
+                        "days": days,
+                        "meal_types": [m.value for m in req.meal_types],
+                        "cuisines": req.cuisines,
+                        "budget": float(req.budget) if req.budget is not None else None,
+                        "household_size": req.household_size,
+                    },
+                )
         except Exception:  # noqa: BLE001
             pass
         with connect() as conn:

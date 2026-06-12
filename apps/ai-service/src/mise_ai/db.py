@@ -445,6 +445,120 @@ def get_shopping_list(conn: psycopg.Connection, shopping_list_id: UUID) -> dict[
     }
 
 
+# --------------------------------------------------------------------------- #
+# Household profile (onboarding snapshot), consent ledger, analytics events.
+# --------------------------------------------------------------------------- #
+
+# Columns a client may set on the household profile (whitelist guards the SET).
+_PROFILE_FIELDS = (
+    "household_size",
+    "weekly_budget",
+    "preferred_cuisines",
+    "preferred_meal_types",
+    "cooking_time",
+    "dietary_flags",
+    "avoid_text",
+    "region",
+    "store_preference",
+)
+
+
+def get_household_profile(conn: psycopg.Connection, household_id: UUID) -> dict[str, Any]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select name, household_size, weekly_budget, preferred_cuisines,
+                   preferred_meal_types, cooking_time, dietary_flags, avoid_text,
+                   region, store_preference, onboarding_completed_at
+            from households where id = %s
+            """,
+            (household_id,),
+        )
+        r = cur.fetchone()
+    if r is None:
+        raise ValueError(f"household {household_id} not found")
+    return {
+        "name": r[0],
+        "household_size": r[1],
+        "weekly_budget": r[2],
+        "preferred_cuisines": r[3],
+        "preferred_meal_types": r[4],
+        "cooking_time": r[5],
+        "dietary_flags": r[6],
+        "avoid_text": r[7],
+        "region": r[8],
+        "store_preference": r[9],
+        "onboarding_completed_at": r[10],
+    }
+
+
+def update_household_profile(
+    conn: psycopg.Connection,
+    household_id: UUID,
+    fields: dict[str, Any],
+    complete_onboarding: bool = False,
+) -> None:
+    """Update whitelisted profile columns. Unknown keys are ignored. When
+    `complete_onboarding`, stamp onboarding_completed_at (idempotently)."""
+    sets = [f"{k} = %s" for k in fields if k in _PROFILE_FIELDS]
+    values: list[Any] = [v for k, v in fields.items() if k in _PROFILE_FIELDS]
+    if complete_onboarding:
+        sets.append("onboarding_completed_at = coalesce(onboarding_completed_at, now())")
+    if not sets:
+        return
+    values.append(household_id)
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            f"update households set {', '.join(sets)} where id = %s",  # noqa: S608 (cols whitelisted)
+            values,
+        )
+
+
+def record_consent(
+    conn: psycopg.Connection, user_id: UUID, kind: str, granted: bool, version: str
+) -> None:
+    """Append a consent decision to the ledger (history-preserving)."""
+    with conn.transaction(), conn.cursor() as cur:
+        # clock_timestamp() (not now()) so rows written in the same transaction
+        # still order correctly — now() is fixed at transaction start.
+        cur.execute(
+            "insert into user_consents (user_id, kind, granted, version, created_at) "
+            "values (%s, %s, %s, %s, clock_timestamp())",
+            (user_id, kind, granted, version),
+        )
+
+
+def get_current_consents(conn: psycopg.Connection, user_id: UUID) -> dict[str, bool]:
+    """Current consent state per kind (latest ledger row wins)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select distinct on (kind) kind, granted
+            from user_consents
+            where user_id = %s
+            order by kind, created_at desc
+            """,
+            (user_id,),
+        )
+        return {row[0]: row[1] for row in cur.fetchall()}
+
+
+def log_event(
+    conn: psycopg.Connection,
+    event_type: str,
+    user_id: UUID | None = None,
+    household_id: UUID | None = None,
+    properties: dict[str, Any] | None = None,
+) -> None:
+    """Append a structured analytics event. Best-effort at the call site."""
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            "insert into analytics_events (user_id, household_id, event_type, properties) "
+            "values (%s, %s, %s, %s)",
+            (user_id, household_id, event_type, Jsonb(properties or {})),
+        )
+
+
 def get_user_theme(conn: psycopg.Connection, user_id: UUID) -> str | None:
     with conn.cursor() as cur:
         cur.execute("select theme from users where id = %s", (user_id,))
