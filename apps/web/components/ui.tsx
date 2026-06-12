@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type {
   ButtonHTMLAttributes,
   HTMLAttributes,
@@ -61,6 +62,51 @@ export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInpu
 export function Label({ children }: { children: ReactNode }) {
   return (
     <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">{children}</span>
+  );
+}
+
+/** Small "i" affordance that reveals a short explanation on click. Closes on
+ *  outside click or Escape. Use beside a form-field label. */
+export function InfoTip({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <span ref={ref} className="relative inline-flex">
+      <button
+        type="button"
+        aria-label={`About ${label}`}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="grid h-4 w-4 place-items-center rounded-full border border-line text-[10px] font-semibold leading-none text-muted hover:border-accent hover:text-accent-ink"
+      >
+        i
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute left-0 top-6 z-10 w-60 rounded-md border border-line bg-surface p-3 text-xs font-normal leading-relaxed text-ink shadow-card"
+        >
+          {children}
+        </span>
+      )}
+    </span>
   );
 }
 

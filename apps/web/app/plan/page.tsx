@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { MEAL_TYPES, type MealType } from "@mise/shared";
 
-import { Button, Card, Input, Thumb } from "../../components/ui";
+import { Button, Card, InfoTip, Input, Thumb } from "../../components/ui";
 import { SectionLabel } from "../shell";
 import { useWorkspace } from "../workspace";
 
@@ -31,8 +31,8 @@ export default function PlanPage() {
   const [endDate, setEndDate] = useState("2026-06-14");
   const [size, setSize] = useState(2);
   const [mealTypes, setMealTypes] = useState<MealType[]>(["dinner"]);
-  const [flags, setFlags] = useState("vegetarian");
-  const [avoid, setAvoid] = useState("no mushrooms");
+  const [flags, setFlags] = useState("");
+  const [avoid, setAvoid] = useState("");
   const [budget, setBudget] = useState("60");
 
   const toggleMeal = (m: MealType) =>
@@ -124,11 +124,25 @@ export default function PlanPage() {
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Dietary flags">
-            <Input value={flags} onChange={(e) => setFlags(e.target.value)} />
+          <Field
+            label="Dietary flags"
+            info="Diets every meal must follow. Comma-separated, e.g. vegetarian, vegan, gluten-free, dairy-free. Leave blank for no restrictions."
+          >
+            <Input
+              placeholder="e.g. vegetarian, gluten-free"
+              value={flags}
+              onChange={(e) => setFlags(e.target.value)}
+            />
           </Field>
-          <Field label="Avoid">
-            <Input value={avoid} onChange={(e) => setAvoid(e.target.value)} />
+          <Field
+            label="Avoid"
+            info="Ingredients or things to keep out, in plain words — e.g. no mushrooms, no shellfish, not too spicy. The planner works around these."
+          >
+            <Input
+              placeholder="e.g. no mushrooms, no pork"
+              value={avoid}
+              onChange={(e) => setAvoid(e.target.value)}
+            />
           </Field>
         </div>
 
@@ -223,14 +237,25 @@ export default function PlanPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  info,
+  children,
+}: {
+  label: string;
+  info?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <label className="block">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-        {label}
+    <div className="block">
+      <span className="flex items-center gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+          {label}
+        </span>
+        {info && <InfoTip label={label}>{info}</InfoTip>}
       </span>
       <div className="mt-1">{children}</div>
-    </label>
+    </div>
   );
 }
 
