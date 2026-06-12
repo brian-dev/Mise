@@ -39,7 +39,28 @@ export interface PlanMeal {
   meal_type: MealType;
   servings: number;
   cooked_at: string | null;
+  recipe_id: string;
   recipe_title: string;
+}
+
+export interface RecipeIngredient {
+  name: string;
+  quantity: string;
+  unit: string;
+  is_optional: boolean;
+}
+
+export interface RecipeDetail {
+  recipe_id: string;
+  title: string;
+  description: string | null;
+  cuisine_tags: string[];
+  prep_time: number | null;
+  cook_time: number | null;
+  default_servings: number;
+  instructions: string | null;
+  image_url: string | null;
+  ingredients: RecipeIngredient[];
 }
 
 export interface PlanDay {
@@ -109,6 +130,7 @@ export interface UpcomingMeal {
   date: string;
   meal_id: string;
   meal_type: MealType;
+  recipe_id: string;
   recipe_title: string;
 }
 
@@ -169,6 +191,7 @@ export const api = {
     }),
   getJob: (id: string) => req<JobStatus>(`/v1/jobs/${id}`),
   getMealPlan: (id: string) => req<MealPlanDetail>(`/v1/meal-plans/${id}`),
+  getRecipe: (id: string) => req<RecipeDetail>(`/v1/recipes/${id}`),
   // The household's latest plan, or null when there's none (404).
   getLatestPlan: async (householdId: string): Promise<MealPlanDetail | null> => {
     try {

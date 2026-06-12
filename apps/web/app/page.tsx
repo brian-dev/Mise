@@ -115,9 +115,11 @@ function DashboardGrid({ data }: { data: Dashboard | null }) {
         <SectionLabel>Up next</SectionLabel>
         {tonight ? (
           <>
-            <h3 className="mt-2 font-display text-xl font-semibold tracking-tight">
-              {tonight.recipe_title}
-            </h3>
+            <Link href={`/recipe/${tonight.recipe_id}`}>
+              <h3 className="mt-2 font-display text-xl font-semibold tracking-tight hover:text-accent-ink">
+                {tonight.recipe_title}
+              </h3>
+            </Link>
             <p className="mt-1 text-sm text-muted">
               {titleCase(tonight.meal_type)} · {shortDate(tonight.date)}
             </p>
@@ -125,8 +127,8 @@ function DashboardGrid({ data }: { data: Dashboard | null }) {
               <Link href="/plan">
                 <Button>Cook</Button>
               </Link>
-              <Link href="/plan">
-                <Button variant="ghost">View plan</Button>
+              <Link href={`/recipe/${tonight.recipe_id}`}>
+                <Button variant="ghost">View recipe</Button>
               </Link>
             </div>
           </>
