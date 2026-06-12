@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Fraunces, Inter } from "next/font/google";
 
 import "./globals.css";
+import { AppShell } from "./shell";
 import { ThemeProvider } from "./theme";
 
 const fraunces = Fraunces({
@@ -25,7 +26,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" data-theme="warm" className={`${fraunces.variable} ${inter.variable}`}>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AppShell>{children}</AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );

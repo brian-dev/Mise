@@ -32,19 +32,22 @@ test("sign up, seed a plan, see it, cook a meal", async ({ page }) => {
   }, API);
   expect(seeded.meal_plan_id).toBeTruthy();
 
-  // 3. Reload, select the seeded household — its plan loads (no regeneration).
+  // 3. Reload, select the seeded household (switcher lives in the app header),
+  //    then open the Plan tab — its plan loads (no regeneration).
   await page.reload();
   await page
     .getByTestId("household-select")
     .selectOption({ label: "E2E Household" });
+  await page.getByTestId("nav-plan").click();
   await expect(page.getByTestId("recipe-title")).toHaveText("E2E Test Dinner");
 
   // 4. Cook the meal → it shows as cooked.
   await page.getByTestId("cook").first().click();
   await expect(page.getByTestId("cooked").first()).toBeVisible();
 
-  // 5. Build the shopping list → an estimated total appears.
+  // 5. Build the shopping list, open the Shopping tab → an estimated total appears.
   await page.getByTestId("build-shopping").click();
+  await page.getByTestId("nav-shopping").click();
   await expect(page.getByTestId("shopping-list")).toBeVisible();
   await expect(page.getByTestId("estimated-total")).toContainText("$");
 });

@@ -1,6 +1,11 @@
 "use client";
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import type {
+  ButtonHTMLAttributes,
+  HTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+} from "react";
 
 // Core kit, built to the design tokens (theme-agnostic). Grows as we rebuild
 // screens; this is the seed used by the new auth screen.
@@ -32,12 +37,13 @@ export function Button({
 export function Card({
   className = "",
   children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`bg-surface border border-line rounded-lg shadow-card ${className}`}>
+    <div
+      className={`bg-surface border border-line rounded-lg shadow-card ${className}`}
+      {...props}
+    >
       {children}
     </div>
   );

@@ -19,12 +19,12 @@ export function useSession(): Session | null | undefined {
 
 export function SignOutButton({ email }: { email?: string }) {
   return (
-    <span className="float-right text-sm text-muted">
-      <span data-testid="user-email">{email}</span>{" "}
+    <span className="inline-flex items-center gap-2 text-sm text-muted">
+      <span data-testid="user-email">{email}</span>
       <button
         data-testid="sign-out"
         onClick={() => supabase.auth.signOut()}
-        className="ml-2 font-semibold text-accent-ink hover:underline"
+        className="font-semibold text-accent-ink hover:underline"
       >
         Sign out
       </button>
