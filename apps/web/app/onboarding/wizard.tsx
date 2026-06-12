@@ -79,7 +79,7 @@ export function OnboardingWizard({ status }: { status: OnboardingStatus }) {
   const current = steps[step]!;
   const isLast = step === steps.length - 1;
 
-  async function finish(skipped: boolean) {
+  async function finish() {
     setBusy(true);
     setError(null);
     try {
@@ -104,9 +104,7 @@ export function OnboardingWizard({ status }: { status: OnboardingStatus }) {
         ([kind, granted]) => ({ kind, granted }),
       );
       await api.postConsents(CONSENT_VERSION, decisions);
-      await api
-        .logEvent("onboarding_finished", householdId, { skipped })
-        .catch(() => {});
+      await api.logEvent("onboarding_finished", householdId, {}).catch(() => {});
       // Reload so the workspace picks up the new household + the gate clears.
       window.location.assign("/");
     } catch (e) {
@@ -118,19 +116,11 @@ export function OnboardingWizard({ status }: { status: OnboardingStatus }) {
   return (
     <main className="min-h-screen bg-bg">
       <div className="mx-auto flex min-h-screen max-w-xl flex-col px-5 py-7">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header — onboarding is required, so there's no skip. */}
+        <div className="flex items-center">
           <span className="font-display text-xl font-semibold tracking-tight">
             Mise<span className="text-accent">.</span>
           </span>
-          <button
-            onClick={() => finish(true)}
-            disabled={busy}
-            className="text-sm font-medium text-muted hover:text-ink disabled:opacity-50"
-            data-testid="onboarding-skip"
-          >
-            Skip for now
-          </button>
         </div>
 
         {/* Progress */}
@@ -170,7 +160,7 @@ export function OnboardingWizard({ status }: { status: OnboardingStatus }) {
             Back
           </Button>
           {isLast ? (
-            <Button onClick={() => finish(false)} disabled={busy} data-testid="onboarding-finish">
+            <Button onClick={() => finish()} disabled={busy} data-testid="onboarding-finish">
               {busy ? "Setting up…" : "Finish"}
             </Button>
           ) : (

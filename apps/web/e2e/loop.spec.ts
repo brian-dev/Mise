@@ -10,12 +10,12 @@ const API = process.env.E2E_API_URL ?? "http://localhost:8000";
 test("sign up, seed a plan, see it, cook a meal", async ({ page }) => {
   const email = `e2e-${Date.now()}@mise.test`;
 
-  // 1. Sign up through the UI. New users land on the onboarding wizard.
+  // 1. Sign up through the UI. New users land on the (required) onboarding wizard.
   await page.goto("/");
   await page.getByTestId("login-email").fill(email);
   await page.getByTestId("login-password").fill("password123");
   await page.getByTestId("login-signup").click();
-  await expect(page.getByTestId("onboarding-skip")).toBeVisible();
+  await expect(page.getByTestId("onboarding-next")).toBeVisible();
 
   // 2. Seed a household + plan deterministically via the test hook (also marks
   //    onboarding complete), using the signed-in session token from the browser.
