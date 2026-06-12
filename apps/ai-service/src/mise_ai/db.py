@@ -230,6 +230,25 @@ def get_recipe_detail(conn: psycopg.Connection, recipe_id: UUID) -> dict[str, An
     }
 
 
+def recipes_missing_image_for_plan(
+    conn: psycopg.Connection, meal_plan_id: UUID
+) -> list[dict[str, Any]]:
+    """Distinct recipes used by a plan that don't yet have an image, with the
+    title + cuisine needed to resolve one."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select distinct r.id, r.title, r.cuisine_tags
+            from meals m
+            join meal_plan_days d on d.id = m.meal_plan_day_id
+            join recipes r on r.id = m.recipe_id
+            where d.meal_plan_id = %s and r.image_url is null
+            """,
+            (meal_plan_id,),
+        )
+        return [{"id": r[0], "title": r[1], "cuisine_tags": r[2]} for r in cur.fetchall()]
+
+
 def set_recipe_image(conn: psycopg.Connection, recipe_id: UUID, image_url: str) -> None:
     with conn.transaction(), conn.cursor() as cur:
         cur.execute(
@@ -299,7 +318,8 @@ def get_meal_plan(conn: psycopg.Connection, meal_plan_id: UUID) -> dict[str, Any
 
         cur.execute(
             """
-            select d.date, m.id, m.meal_type, m.servings, m.cooked_at, r.id, r.title
+            select d.date, m.id, m.meal_type, m.servings, m.cooked_at,
+                   r.id, r.title, r.image_url
             from meal_plan_days d
             join meals m on m.meal_plan_day_id = d.id
             join recipes r on r.id = m.recipe_id
@@ -309,7 +329,9 @@ def get_meal_plan(conn: psycopg.Connection, meal_plan_id: UUID) -> dict[str, Any
             (meal_plan_id,),
         )
         days: dict[Any, list[dict[str, Any]]] = {}
-        for date_, meal_id, meal_type, servings, cooked_at, recipe_id, title in cur.fetchall():
+        for date_, meal_id, meal_type, servings, cooked_at, recipe_id, title, image_url in (
+            cur.fetchall()
+        ):
             days.setdefault(date_, []).append(
                 {
                     "meal_id": meal_id,
@@ -318,6 +340,7 @@ def get_meal_plan(conn: psycopg.Connection, meal_plan_id: UUID) -> dict[str, Any
                     "cooked_at": cooked_at,
                     "recipe_id": recipe_id,
                     "recipe_title": title,
+                    "image_url": image_url,
                 }
             )
     return {

@@ -9,6 +9,7 @@ are stubbed and will be implemented in the first AI-service feature PR:
     POST /v1/pricing/estimate      -> synchronous
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -40,6 +41,7 @@ from .db import (
     list_households,
     meal_swap_context,
     persist_meal_plan,
+    recipes_missing_image_for_plan,
     set_job_status,
     swap_meal_recipe,
 )
@@ -307,6 +309,29 @@ class JobStatus(BaseModel):
     error: str | None
 
 
+def _populate_plan_images(meal_plan_id: UUID) -> None:
+    """Resolve + store a representative photo for each of a plan's recipes that
+    lacks one (Pexels, keyed title→cuisine). Best-effort and parallel; any failure
+    is ignored so a missing image never affects the plan. No-op without a key."""
+    with connect() as conn:
+        recipes = recipes_missing_image_for_plan(conn, meal_plan_id)
+    if not recipes:
+        return
+
+    def resolve(rec: dict[str, Any]) -> tuple[UUID, str | None]:
+        cuisine = rec["cuisine_tags"][0] if rec["cuisine_tags"] else ""
+        return rec["id"], search_image(rec["title"], f"{cuisine} food".strip(), "food")
+
+    with ThreadPoolExecutor(max_workers=settings.parallel_max_workers) as pool:
+        results = list(pool.map(resolve, recipes))
+
+    pairs = [(rid, url) for rid, url in results if url]
+    if pairs:
+        with connect() as conn:
+            for rid, url in pairs:
+                set_recipe_image(conn, rid, url)
+
+
 def _run_meal_plan_job(job_id: UUID, req: MealPlanRequest) -> None:
     """Background worker: generate + persist, updating the job row (ARCHITECTURE §5).
 
@@ -319,6 +344,13 @@ def _run_meal_plan_job(job_id: UUID, req: MealPlanRequest) -> None:
         result = generate_meal_plan(req)
         with connect() as conn:
             meal_plan_id = persist_meal_plan(conn, result.plan, req)
+        # Best-effort: fetch representative photos so the plan/cards have images on
+        # first load. Never let this fail the job.
+        try:
+            _populate_plan_images(meal_plan_id)
+        except Exception:  # noqa: BLE001
+            pass
+        with connect() as conn:
             set_job_status(
                 conn,
                 job_id,

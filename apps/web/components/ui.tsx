@@ -63,3 +63,42 @@ export function Label({ children }: { children: ReactNode }) {
     <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">{children}</span>
   );
 }
+
+/** Square recipe thumbnail with a graceful fallback when there's no image yet
+ *  (representative stock photos, not exact-dish renders — UX_DESIGN.md §8). */
+export function Thumb({
+  src,
+  alt,
+  size = 44,
+  className = "",
+}: {
+  src: string | null;
+  alt: string;
+  size?: number;
+  className?: string;
+}) {
+  const style = { width: size, height: size };
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={src}
+        alt={alt}
+        style={style}
+        className={`shrink-0 rounded-md border border-line object-cover ${className}`}
+      />
+    );
+  }
+  return (
+    <div
+      style={style}
+      aria-hidden
+      className={`grid shrink-0 place-items-center rounded-md border border-line bg-surface-2 text-muted ${className}`}
+    >
+      <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 2v7a3 3 0 0 0 3 3v10M6 2v6M9 2v6M9 2v7a3 3 0 0 1-3 3" />
+        <path d="M18 2c-1.5 0-3 1.8-3 5s1.5 4 3 4v9" />
+      </svg>
+    </div>
+  );
+}

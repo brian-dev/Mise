@@ -41,6 +41,7 @@ export interface PlanMeal {
   cooked_at: string | null;
   recipe_id: string;
   recipe_title: string;
+  image_url: string | null;
 }
 
 export interface RecipeIngredient {
@@ -132,6 +133,7 @@ export interface UpcomingMeal {
   meal_type: MealType;
   recipe_id: string;
   recipe_title: string;
+  image_url: string | null;
 }
 
 export interface UseSoonAlert {

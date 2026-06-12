@@ -14,7 +14,12 @@ import pytest
 
 from mise_ai import pexels
 from mise_ai.config import settings
-from mise_ai.db import get_recipe_detail, persist_meal_plan, set_recipe_image
+from mise_ai.db import (
+    get_recipe_detail,
+    persist_meal_plan,
+    recipes_missing_image_for_plan,
+    set_recipe_image,
+)
 from mise_ai.schemas import (
     GeneratedDay,
     GeneratedIngredient,
@@ -97,6 +102,28 @@ def test_set_recipe_image_persists(conn: psycopg.Connection) -> None:
     recipe_id = _seed_recipe(conn)
     set_recipe_image(conn, recipe_id, "https://example.com/photo.jpg")
     assert get_recipe_detail(conn, recipe_id)["image_url"] == "https://example.com/photo.jpg"
+
+
+@pytest.mark.db
+def test_recipes_missing_image_for_plan(conn: psycopg.Connection) -> None:
+    recipe_id = _seed_recipe(conn)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select d.meal_plan_id from meals m
+            join meal_plan_days d on d.id = m.meal_plan_day_id
+            where m.recipe_id = %s limit 1
+            """,
+            (recipe_id,),
+        )
+        meal_plan_id = cur.fetchone()[0]  # type: ignore[index]
+
+    missing = recipes_missing_image_for_plan(conn, meal_plan_id)
+    assert [m["id"] for m in missing] == [recipe_id]
+
+    # Once the image is set, the recipe drops out of the "missing" set.
+    set_recipe_image(conn, recipe_id, "https://example.com/p.jpg")
+    assert recipes_missing_image_for_plan(conn, meal_plan_id) == []
 
 
 def test_search_image_without_key_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
