@@ -422,6 +422,18 @@ def get_shopping_list(conn: psycopg.Connection, shopping_list_id: UUID) -> dict[
     }
 
 
+def get_user_theme(conn: psycopg.Connection, user_id: UUID) -> str | None:
+    with conn.cursor() as cur:
+        cur.execute("select theme from users where id = %s", (user_id,))
+        row = cur.fetchone()
+    return cast("str | None", row[0]) if row is not None else None
+
+
+def set_user_theme(conn: psycopg.Connection, user_id: UUID, theme: str) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute("update users set theme = %s where id = %s", (theme, user_id))
+
+
 def normalize_name(name: str) -> str:
     """Lowercase + collapse whitespace. Canonical names live in the catalog;
     the emitted name is only used to find/create the catalog row (AI_LAYER §5)."""

@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 
+import { api } from "../lib/api";
 import { Login, SignOutButton, useSession } from "./auth";
+import { THEMES, useTheme, type Theme } from "./theme";
 import { useWorkspace, WorkspaceProvider } from "./workspace";
 
 const TABS = [
@@ -21,9 +24,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (session === null) return <Login />;
   return (
     <WorkspaceProvider>
+      <ThemeSync />
       <Chrome email={session.user.email}>{children}</Chrome>
     </WorkspaceProvider>
   );
+}
+
+/** On sign-in, pull the user's saved theme from their profile and apply it, so the
+ *  choice follows across devices. localStorage stays the instant pre-auth cache;
+ *  this corrects it once we can read the profile. Pulls once per mount. */
+function ThemeSync() {
+  const { setTheme } = useTheme();
+  const pulled = useRef(false);
+  useEffect(() => {
+    if (pulled.current) return;
+    pulled.current = true;
+    api
+      .getMyTheme()
+      .then(({ theme }) => {
+        if (theme && (THEMES as readonly string[]).includes(theme)) {
+          setTheme(theme as Theme);
+        }
+      })
+      .catch(() => {}); // best-effort; localStorage value stands
+  }, [setTheme]);
+  return null;
 }
 
 function Chrome({

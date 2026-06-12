@@ -30,7 +30,9 @@ from .db import (
     get_recipe_detail,
     get_recipe_for_prompt,
     get_shopping_list,
+    get_user_theme,
     set_recipe_image,
+    set_user_theme,
     household_for_meal,
     household_for_meal_plan,
     household_for_shopping_list,
@@ -83,6 +85,40 @@ def health() -> dict[str, str]:
 # --------------------------------------------------------------------------- #
 class HouseholdCreate(BaseModel):
     name: str
+
+
+_THEMES = {"warm", "fresh", "dark"}
+
+
+class ThemeResponse(BaseModel):
+    theme: str | None
+
+
+class ThemeUpdate(BaseModel):
+    theme: str
+
+
+@app.get("/v1/me/theme", response_model=ThemeResponse)
+def get_theme(user: UUID | None = Depends(current_user)) -> ThemeResponse:
+    """The signed-in user's saved theme (null if unset / unauthenticated)."""
+    if user is None:
+        return ThemeResponse(theme=None)
+    with connect() as conn:
+        return ThemeResponse(theme=get_user_theme(conn, user))
+
+
+@app.put("/v1/me/theme", response_model=ThemeResponse)
+def put_theme(
+    req: ThemeUpdate, user: UUID | None = Depends(current_user)
+) -> ThemeResponse:
+    """Persist the user's theme choice to their profile (follows across devices)."""
+    if user is None:
+        raise HTTPException(status_code=401, detail="authentication required")
+    if req.theme not in _THEMES:
+        raise HTTPException(status_code=422, detail=f"unknown theme {req.theme!r}")
+    with connect() as conn:
+        set_user_theme(conn, user, req.theme)
+    return ThemeResponse(theme=req.theme)
 
 
 @app.get("/v1/households")
