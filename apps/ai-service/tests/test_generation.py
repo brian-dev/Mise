@@ -130,3 +130,36 @@ def test_parallel_merges_days_in_order(monkeypatch) -> None:
     result = generate_meal_plan(_req())  # 2-day request -> 2 concurrent calls
     assert [d.date.isoformat() for d in result.plan.days] == ["2026-06-10", "2026-06-11"]
     assert len(result.usage) == 2  # one usage entry per day
+
+
+def test_day_hints_no_preference_rotates_defaults() -> None:
+    hints = gen._day_hints([], 3)
+    assert hints == gen._CUISINES[:3]
+
+
+def test_day_hints_prefers_chosen_with_wildcard_every_fifth() -> None:
+    chosen = ["Italian", "Mexican"]
+    hints = gen._day_hints(chosen, 6)
+    # Days 0-3 + 5 rotate the chosen list; day 4 (every 5th) is an off-list wildcard.
+    assert hints[0] == "Italian"
+    assert hints[1] == "Mexican"
+    assert hints[2] == "Italian"
+    assert hints[3] == "Mexican"
+    assert hints[4] not in {"Italian", "Mexican"}  # wildcard for variety
+    assert hints[5] == "Italian"
+
+
+def test_day_hints_passes_cuisine_through_parallel(monkeypatch) -> None:
+    """The per-day requests in parallel generation carry the chosen-cuisine hints."""
+    monkeypatch.setattr(settings, "parallel_generation", True)
+    seen: dict[str, str | None] = {}
+
+    def fake_one_shot(req: MealPlanRequest) -> MealPlanResult:
+        seen[req.start_date.isoformat()] = req.cuisine_hint
+        plan = GeneratedMealPlan.model_validate(_plan([req.start_date.isoformat()]))
+        return MealPlanResult(plan=plan, usage=[_usage()], repair_attempts=0)
+
+    monkeypatch.setattr(gen, "_generate_one_shot", fake_one_shot)
+    generate_meal_plan(_req(cuisines=["Thai"]))  # 2-day request
+    assert seen["2026-06-10"] == "Thai"
+    assert seen["2026-06-11"] == "Thai"

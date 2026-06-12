@@ -173,6 +173,7 @@ export interface GenerateRequest {
   meal_types: MealType[];
   dietary: { flags: string[]; avoid_text: string | null };
   budget: number | null;
+  cuisines: string[];
 }
 
 export const api = {

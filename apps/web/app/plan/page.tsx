@@ -34,9 +34,31 @@ export default function PlanPage() {
   const [flags, setFlags] = useState("");
   const [avoid, setAvoid] = useState("");
   const [budget, setBudget] = useState("60");
+  const [cuisines, setCuisines] = useState<string[]>([]);
+  const [customCuisine, setCustomCuisine] = useState("");
 
   const toggleMeal = (m: MealType) =>
     setMealTypes((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
+
+  const toggleCuisine = (c: string) =>
+    setCuisines((prev) =>
+      prev.some((x) => x.toLowerCase() === c.toLowerCase())
+        ? prev.filter((x) => x.toLowerCase() !== c.toLowerCase())
+        : [...prev, c],
+    );
+
+  const addCustomCuisine = () => {
+    const c = customCuisine.trim();
+    if (c && !cuisines.some((x) => x.toLowerCase() === c.toLowerCase())) {
+      setCuisines((prev) => [...prev, c]);
+    }
+    setCustomCuisine("");
+  };
+
+  // Selected cuisines that aren't in the curated set (so they still show as chips).
+  const customSelected = cuisines.filter(
+    (c) => !CUISINE_OPTIONS.some((o) => o.toLowerCase() === c.toLowerCase()),
+  );
 
   const onGenerate = () =>
     generate({
@@ -47,6 +69,7 @@ export default function PlanPage() {
       flags,
       avoid,
       budget,
+      cuisines,
     });
 
   const onBuildList = async () => {
@@ -120,6 +143,47 @@ export default function PlanPage() {
                 {m}
               </label>
             ))}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <span className="flex items-center gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+              Cuisines
+            </span>
+            <InfoTip label="Cuisines">
+              Cuisines you&apos;d like the plan to lean toward. Most meals will be on-list,
+              with the occasional wildcard for variety. Leave empty for no preference.
+            </InfoTip>
+          </span>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {CUISINE_OPTIONS.map((c) => (
+              <CuisineChip
+                key={c}
+                label={c}
+                active={cuisines.some((x) => x.toLowerCase() === c.toLowerCase())}
+                onClick={() => toggleCuisine(c)}
+              />
+            ))}
+            {customSelected.map((c) => (
+              <CuisineChip key={c} label={c} active onClick={() => toggleCuisine(c)} />
+            ))}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <Input
+              placeholder="Add another cuisine…"
+              value={customCuisine}
+              onChange={(e) => setCustomCuisine(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustomCuisine();
+                }
+              }}
+            />
+            <Button variant="ghost" onClick={addCustomCuisine} disabled={!customCuisine.trim()}>
+              Add
+            </Button>
           </div>
         </div>
 
@@ -234,6 +298,48 @@ export default function PlanPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+// Curated cuisine set (mirrors the generator's defaults, plus common extras).
+// Users can add anything else via the free-text field.
+const CUISINE_OPTIONS = [
+  "Italian",
+  "Mexican",
+  "Indian",
+  "Thai",
+  "Mediterranean",
+  "Japanese",
+  "Chinese",
+  "Korean",
+  "American",
+  "French",
+  "Middle Eastern",
+  "Greek",
+];
+
+function CuisineChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+        active
+          ? "border-accent bg-accent text-white"
+          : "border-line bg-surface text-ink hover:bg-surface-2"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
