@@ -95,6 +95,52 @@ export interface ShoppingListDetail {
   items: ShoppingItem[];
 }
 
+export interface DashboardPlan {
+  meal_plan_id: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  budget: string | null;
+  meals_total: number;
+  meals_cooked: number;
+}
+
+export interface UpcomingMeal {
+  date: string;
+  meal_id: string;
+  meal_type: MealType;
+  recipe_title: string;
+}
+
+export interface UseSoonAlert {
+  name: string;
+  quantity: string;
+  unit: string;
+  expires_on: string;
+}
+
+export interface RunningLowAlert {
+  name: string;
+  quantity: string;
+  unit: string;
+}
+
+export interface NeededAlert {
+  name: string;
+  unit: string;
+}
+
+export interface Dashboard {
+  household_id: string;
+  plan: DashboardPlan | null;
+  upcoming_meals: UpcomingMeal[];
+  alerts: {
+    use_soon: UseSoonAlert[];
+    running_low: RunningLowAlert[];
+    needed_not_stocked: NeededAlert[];
+  };
+}
+
 export interface GenerateRequest {
   household_id: string;
   start_date: string;
@@ -110,6 +156,7 @@ export const api = {
   createHousehold: (name: string) =>
     req<Household>("/v1/households", { method: "POST", body: JSON.stringify({ name }) }),
   getPantry: (id: string) => req<PantryItem[]>(`/v1/households/${id}/pantry`),
+  getDashboard: (id: string) => req<Dashboard>(`/v1/households/${id}/dashboard`),
   addByBarcode: (householdId: string, barcode: string) =>
     req<{ name: string; quantity: string; unit: string }>(
       `/v1/households/${householdId}/pantry/add-barcode`,

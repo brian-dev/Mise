@@ -58,6 +58,15 @@ class Settings(BaseSettings):
     parallel_generation: bool = True
     parallel_max_workers: int = 7
 
+    # Dashboard ingredient alerts (spec — home dashboard). "Use soon" flags pantry
+    # items whose estimated expiry (added_at + category shelf life) falls within
+    # this many days; unknown categories fall back to default_shelf_life_days.
+    # "Running low" flags pantry items at or below the quantity threshold.
+    use_soon_window_days: int = 3
+    default_shelf_life_days: int = 14
+    running_low_threshold: float = 1.0
+    upcoming_meals_limit: int = 6
+
     # Test mode (MISE_TEST_MODE=true) mounts /v1/test/* helper endpoints used by
     # E2E tests to reach app states fast and deterministically WITHOUT calling
     # Claude. Never enable in production.
