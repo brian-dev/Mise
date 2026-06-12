@@ -27,8 +27,10 @@ from .db import (
     get_job,
     get_meal_plan,
     get_pantry,
+    get_recipe_detail,
     get_recipe_for_prompt,
     get_shopping_list,
+    set_recipe_image,
     household_for_meal,
     household_for_meal_plan,
     household_for_shopping_list,
@@ -42,6 +44,7 @@ from .db import (
 from .dashboard import build_dashboard
 from .generation import GenerationError, generate_meal_plan, generate_recipe
 from .openfoodfacts import lookup_product
+from .pexels import search_image
 from .pantry import cook_meal
 from .pricing import PricingError, PricingItem, resolve_prices
 from .schemas import Dietary, MealPlanRequest, PantryItem, RecipeRequest, Unit
@@ -197,6 +200,48 @@ def meal_plan(
             return get_meal_plan(conn, meal_plan_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+class RecipeIngredientOut(BaseModel):
+    name: str
+    quantity: Decimal
+    unit: str
+    is_optional: bool
+
+
+class RecipeDetail(BaseModel):
+    recipe_id: UUID
+    title: str
+    description: str | None
+    cuisine_tags: list[str]
+    prep_time: int | None
+    cook_time: int | None
+    default_servings: int
+    instructions: str | None
+    image_url: str | None
+    ingredients: list[RecipeIngredientOut]
+
+
+@app.get("/v1/recipes/{recipe_id}", response_model=RecipeDetail)
+def recipe(recipe_id: UUID, user: UUID | None = Depends(current_user)) -> RecipeDetail:
+    """Full recipe for the detail screen. Recipes live in a shared pool, so this is
+    auth-only (not household-scoped). On first view, lazily resolves a
+    representative photo (Pexels, keyed title→cuisine) and stores it."""
+    try:
+        with connect() as conn:
+            detail = get_recipe_detail(conn, recipe_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    if detail["image_url"] is None:
+        cuisine = detail["cuisine_tags"][0] if detail["cuisine_tags"] else ""
+        image_url = search_image(detail["title"], f"{cuisine} food".strip(), "food")
+        if image_url:
+            with connect() as conn:
+                set_recipe_image(conn, recipe_id, image_url)
+            detail["image_url"] = image_url
+
+    return RecipeDetail(**detail)
 
 
 @app.get("/v1/shopping-lists/{shopping_list_id}")

@@ -91,7 +91,7 @@ def _upcoming_meals(
     with conn.cursor() as cur:
         cur.execute(
             """
-            select d.date, m.id, m.meal_type, r.title
+            select d.date, m.id, m.meal_type, r.id, r.title
             from meal_plan_days d
             join meals m on m.meal_plan_day_id = d.id
             join recipes r on r.id = m.recipe_id
@@ -108,7 +108,8 @@ def _upcoming_meals(
                 "date": r[0],
                 "meal_id": r[1],
                 "meal_type": r[2],
-                "recipe_title": r[3],
+                "recipe_id": r[3],
+                "recipe_title": r[4],
             }
             for r in cur.fetchall()
         ]

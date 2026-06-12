@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # (ARCHITECTURE §7). Empty -> free tier (AI estimate only).
     spoonacular_api_key: str = ""
 
+    # Recipe images (UX_DESIGN.md §8): a free Pexels key resolves a representative
+    # (not exact) photo per recipe, keyed on title then cuisine. Empty -> recipes
+    # simply render without a photo.
+    pexels_api_key: str = ""
+
     # CORS allow-list for the local web harness (comma-separated origins).
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 

@@ -190,6 +190,53 @@ def get_recipe_for_prompt(conn: psycopg.Connection, recipe_id: UUID) -> dict[str
     }
 
 
+def get_recipe_detail(conn: psycopg.Connection, recipe_id: UUID) -> dict[str, Any]:
+    """Full recipe for the UI: header, instructions, image, and ingredients
+    (name + quantity + unit). Distinct from `get_recipe_for_prompt`, which shapes
+    the recipe for re-prompting."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "select title, description, cuisine_tags, prep_time, cook_time, "
+            "default_servings, instructions, image_url from recipes where id = %s",
+            (recipe_id,),
+        )
+        r = cur.fetchone()
+        if r is None:
+            raise ValueError(f"recipe {recipe_id} not found")
+        cur.execute(
+            """
+            select i.name, ri.quantity, ri.unit, ri.is_optional
+            from recipe_ingredients ri join ingredients i on i.id = ri.ingredient_id
+            where ri.recipe_id = %s
+            order by ri.is_optional, i.name
+            """,
+            (recipe_id,),
+        )
+        ingredients = [
+            {"name": row[0], "quantity": row[1], "unit": row[2], "is_optional": row[3]}
+            for row in cur.fetchall()
+        ]
+    return {
+        "recipe_id": recipe_id,
+        "title": r[0],
+        "description": r[1],
+        "cuisine_tags": r[2],
+        "prep_time": r[3],
+        "cook_time": r[4],
+        "default_servings": r[5],
+        "instructions": r[6],
+        "image_url": r[7],
+        "ingredients": ingredients,
+    }
+
+
+def set_recipe_image(conn: psycopg.Connection, recipe_id: UUID, image_url: str) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            "update recipes set image_url = %s where id = %s", (image_url, recipe_id)
+        )
+
+
 def swap_meal_recipe(
     conn: psycopg.Connection, meal_id: UUID, recipe: GeneratedRecipe
 ) -> UUID:
@@ -252,7 +299,7 @@ def get_meal_plan(conn: psycopg.Connection, meal_plan_id: UUID) -> dict[str, Any
 
         cur.execute(
             """
-            select d.date, m.id, m.meal_type, m.servings, m.cooked_at, r.title
+            select d.date, m.id, m.meal_type, m.servings, m.cooked_at, r.id, r.title
             from meal_plan_days d
             join meals m on m.meal_plan_day_id = d.id
             join recipes r on r.id = m.recipe_id
@@ -262,13 +309,14 @@ def get_meal_plan(conn: psycopg.Connection, meal_plan_id: UUID) -> dict[str, Any
             (meal_plan_id,),
         )
         days: dict[Any, list[dict[str, Any]]] = {}
-        for date_, meal_id, meal_type, servings, cooked_at, title in cur.fetchall():
+        for date_, meal_id, meal_type, servings, cooked_at, recipe_id, title in cur.fetchall():
             days.setdefault(date_, []).append(
                 {
                     "meal_id": meal_id,
                     "meal_type": meal_type,
                     "servings": servings,
                     "cooked_at": cooked_at,
+                    "recipe_id": recipe_id,
                     "recipe_title": title,
                 }
             )

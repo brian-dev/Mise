@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -182,9 +183,13 @@ export default function PlanPage() {
                       <span className="w-20 shrink-0 text-xs uppercase tracking-wide text-muted">
                         {m.meal_type}
                       </span>
-                      <span data-testid="recipe-title" className="font-medium">
+                      <Link
+                        href={`/recipe/${m.recipe_id}`}
+                        data-testid="recipe-title"
+                        className="font-medium hover:text-accent-ink hover:underline"
+                      >
                         {m.recipe_title}
-                      </span>
+                      </Link>
                       <span className="text-muted">· {m.servings} servings</span>
                       <span className="ml-auto flex items-center gap-2">
                         {m.cooked_at ? (
