@@ -59,10 +59,16 @@ def _seed_recipe(conn: psycopg.Connection) -> UUID:
                             cook_time=20,
                             default_servings=2,
                             instructions="Simmer chickpeas in spiced tomato.",
+                            # Unique fixture names so canonicalization inserts fresh
+                            # rows rather than fuzzy-matching an existing catalog entry
+                            # (keeps the test independent of dev-DB contents).
                             ingredients=[
-                                GeneratedIngredient(name="chickpeas", quantity=2, unit=Unit.cup),
                                 GeneratedIngredient(
-                                    name="cilantro", quantity=1, unit=Unit.tbsp, is_optional=True
+                                    name="qafix chickpea", quantity=2, unit=Unit.cup
+                                ),
+                                GeneratedIngredient(
+                                    name="qafix cilantro", quantity=1, unit=Unit.tbsp,
+                                    is_optional=True,
                                 ),
                             ],
                         ),
@@ -94,7 +100,7 @@ def test_get_recipe_detail_returns_full_recipe(conn: psycopg.Connection) -> None
     assert detail["prep_time"] == 10
     assert detail["image_url"] is None  # not resolved yet
     names = {i["name"] for i in detail["ingredients"]}
-    assert names == {"chickpeas", "cilantro"}
+    assert names == {"qafix chickpea", "qafix cilantro"}
 
 
 @pytest.mark.db

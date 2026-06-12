@@ -37,6 +37,7 @@ export interface GenerateInput {
   flags: string;
   avoid: string;
   budget: string;
+  cuisines: string[];
 }
 
 interface Workspace {
@@ -151,6 +152,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             avoid_text: input.avoid || null,
           },
           budget: input.budget ? Number(input.budget) : null,
+          cuisines: input.cuisines,
         });
         try {
           const job = await waitForJob(job_id, setGenStatus);

@@ -96,6 +96,31 @@ def _validate(
 _CUISINES = ["Italian", "Mexican", "Indian", "Thai", "Mediterranean", "Japanese", "American"]
 
 
+def _day_hints(cuisines: list[str], n_days: int) -> list[str]:
+    """Per-day cuisine hints for parallel generation (each concurrent day can't see
+    the others, so a hint keeps them distinct).
+
+    With preferred `cuisines`, rotate through them but slot an off-list wildcard
+    every 5th day for variety (~4 of 5 on-list). Without a preference, rotate the
+    default set. Deterministic for a given input.
+    """
+    if not cuisines:
+        return [_CUISINES[i % len(_CUISINES)] for i in range(n_days)]
+
+    chosen_lower = {c.lower() for c in cuisines}
+    wild = [c for c in _CUISINES if c.lower() not in chosen_lower] or _CUISINES
+    hints: list[str] = []
+    pi = wi = 0
+    for i in range(n_days):
+        if i % 5 == 4:  # every 5th day -> a wildcard off the preferred list
+            hints.append(wild[wi % len(wild)])
+            wi += 1
+        else:
+            hints.append(cuisines[pi % len(cuisines)])
+            pi += 1
+    return hints
+
+
 def _single_day_request(
     req: MealPlanRequest, day: date, cuisine_hint: str | None = None
 ) -> MealPlanRequest:
@@ -127,11 +152,12 @@ def _generate_parallel(req: MealPlanRequest, days: list[date]) -> MealPlanResult
     (AI_LAYER §D1) — acceptable for the latency win.
     """
     workers = min(len(days), settings.parallel_max_workers)
+    hints = _day_hints(req.cuisines, len(days))
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
             pool.submit(
                 _generate_one_shot,
-                _single_day_request(req, d, req.cuisine_hint or _CUISINES[i % len(_CUISINES)]),
+                _single_day_request(req, d, req.cuisine_hint or hints[i]),
             ): d
             for i, d in enumerate(days)
         }
