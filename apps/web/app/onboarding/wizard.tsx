@@ -5,8 +5,8 @@ import { useState } from "react";
 import { MEAL_TYPES, type MealType } from "@mise/shared";
 
 import { api, type ConsentDecision, type OnboardingStatus } from "../../lib/api";
-import { CUISINE_OPTIONS } from "../../lib/cuisines";
 import { Button, Input } from "../../components/ui";
+import { CuisineSelector } from "../../components/cuisine-selector";
 
 // Bump when the consent copy materially changes; stored with each ledger row.
 const CONSENT_VERSION = "2026-06-12";
@@ -225,9 +225,9 @@ function buildSteps(
       subtitle: "Plans will lean toward these. Add as many as you like — or skip and decide later.",
       canNext: true,
       body: (
-        <CuisinePicker
+        <CuisineSelector
           selected={data.preferred_cuisines}
-          onToggle={(c) => set("preferred_cuisines", toggle(data.preferred_cuisines, c))}
+          onChange={(next) => set("preferred_cuisines", next)}
         />
       ),
     },
@@ -415,57 +415,6 @@ function Chip({
     >
       {label}
     </button>
-  );
-}
-
-function CuisinePicker({
-  selected,
-  onToggle,
-}: {
-  selected: string[];
-  onToggle: (c: string) => void;
-}) {
-  const [custom, setCustom] = useState("");
-  const customSelected = selected.filter(
-    (c) => !CUISINE_OPTIONS.some((o) => o.toLowerCase() === c.toLowerCase()),
-  );
-  const add = () => {
-    const c = custom.trim();
-    if (c) onToggle(c);
-    setCustom("");
-  };
-  return (
-    <div>
-      <div className="flex flex-wrap gap-2">
-        {CUISINE_OPTIONS.map((c) => (
-          <Chip
-            key={c}
-            label={c}
-            active={selected.some((x) => x.toLowerCase() === c.toLowerCase())}
-            onClick={() => onToggle(c)}
-          />
-        ))}
-        {customSelected.map((c) => (
-          <Chip key={c} label={c} active onClick={() => onToggle(c)} />
-        ))}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <Input
-          placeholder="Add another cuisine…"
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-        />
-        <Button variant="ghost" onClick={add} disabled={!custom.trim()}>
-          Add
-        </Button>
-      </div>
-    </div>
   );
 }
 
