@@ -2,13 +2,21 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { MEAL_TYPES, type MealType } from "@mise/shared";
 
+import { api } from "../../lib/api";
 import { Button, Card, InfoTip, Input, Thumb } from "../../components/ui";
+import { CuisineSelector } from "../../components/cuisine-selector";
 import { SectionLabel } from "../shell";
 import { useWorkspace } from "../workspace";
+
+function todayISO(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function PlanPage() {
   const router = useRouter();
@@ -27,38 +35,37 @@ export default function PlanPage() {
   } = useWorkspace();
 
   const [newName, setNewName] = useState("");
-  const [startDate, setStartDate] = useState("2026-06-12");
-  const [endDate, setEndDate] = useState("2026-06-14");
+  const [startDate, setStartDate] = useState(todayISO());
+  const [endDate, setEndDate] = useState(todayISO(2));
   const [size, setSize] = useState(2);
   const [mealTypes, setMealTypes] = useState<MealType[]>(["dinner"]);
   const [flags, setFlags] = useState("");
   const [avoid, setAvoid] = useState("");
-  const [budget, setBudget] = useState("60");
+  const [budget, setBudget] = useState("");
   const [cuisines, setCuisines] = useState<string[]>([]);
-  const [customCuisine, setCustomCuisine] = useState("");
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+
+  // Pre-fill the form from the household profile (set during onboarding / Settings).
+  useEffect(() => {
+    if (!householdId) return;
+    api
+      .getProfile(householdId)
+      .then((p) => {
+        if (p.household_size) setSize(p.household_size);
+        const meals = (p.preferred_meal_types ?? []).filter((m): m is MealType =>
+          (MEAL_TYPES as readonly string[]).includes(m),
+        );
+        if (meals.length) setMealTypes(meals);
+        if (p.weekly_budget) setBudget(p.weekly_budget);
+        if (p.preferred_cuisines?.length) setCuisines(p.preferred_cuisines);
+        if (p.dietary_flags?.length) setFlags(p.dietary_flags.join(", "));
+        if (p.avoid_text) setAvoid(p.avoid_text);
+      })
+      .catch(() => {}); // no profile yet -> keep defaults
+  }, [householdId]);
 
   const toggleMeal = (m: MealType) =>
     setMealTypes((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
-
-  const toggleCuisine = (c: string) =>
-    setCuisines((prev) =>
-      prev.some((x) => x.toLowerCase() === c.toLowerCase())
-        ? prev.filter((x) => x.toLowerCase() !== c.toLowerCase())
-        : [...prev, c],
-    );
-
-  const addCustomCuisine = () => {
-    const c = customCuisine.trim();
-    if (c && !cuisines.some((x) => x.toLowerCase() === c.toLowerCase())) {
-      setCuisines((prev) => [...prev, c]);
-    }
-    setCustomCuisine("");
-  };
-
-  // Selected cuisines that aren't in the curated set (so they still show as chips).
-  const customSelected = cuisines.filter(
-    (c) => !CUISINE_OPTIONS.some((o) => o.toLowerCase() === c.toLowerCase()),
-  );
 
   const onGenerate = () =>
     generate({
@@ -84,6 +91,15 @@ export default function PlanPage() {
     if (modify) void iterate(mealId, modify);
   };
 
+  const generating = busy === "generate";
+  const genLabel = generating
+    ? genStatus === "running"
+      ? "Running…"
+      : genStatus === "queued"
+        ? "Queued…"
+        : "Starting…"
+    : "Generate plan";
+
   return (
     <div className="space-y-4">
       {households.length === 0 && (
@@ -96,140 +112,119 @@ export default function PlanPage() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
             />
-            <Button
-              onClick={() => createHousehold(newName)}
-              disabled={busy === "household"}
-            >
+            <Button onClick={() => createHousehold(newName)} disabled={busy === "household"}>
               Create
             </Button>
           </div>
         </Card>
       )}
 
-      {/* Generation form */}
+      {/* Generate — defaults from the profile; details behind "Customize". */}
       <Card className="p-5">
         <SectionLabel>Generate a plan</SectionLabel>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Field label="Start">
-            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          </Field>
-          <Field label="End">
-            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </Field>
-          <Field label="Household size">
-            <Input
-              type="number"
-              min={1}
-              value={size}
-              onChange={(e) => setSize(Number(e.target.value))}
-            />
-          </Field>
-          <Field label="Budget ($)">
-            <Input value={budget} onChange={(e) => setBudget(e.target.value)} />
-          </Field>
-        </div>
+        <p className="mt-2 text-sm text-muted">{summary({ size, mealTypes, startDate, endDate, budget, cuisines })}</p>
 
-        <div className="mt-4">
-          <SectionLabel>Meals</SectionLabel>
-          <div className="mt-2 flex flex-wrap gap-3 text-sm">
-            {MEAL_TYPES.map((m) => (
-              <label key={m} className="flex items-center gap-1.5 capitalize">
-                <input
-                  type="checkbox"
-                  checked={mealTypes.includes(m)}
-                  onChange={() => toggleMeal(m)}
-                  className="accent-accent"
-                />
-                {m}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <span className="flex items-center gap-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Cuisines
-            </span>
-            <InfoTip label="Cuisines">
-              Cuisines you&apos;d like the plan to lean toward. Most meals will be on-list,
-              with the occasional wildcard for variety. Leave empty for no preference.
-            </InfoTip>
-          </span>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {CUISINE_OPTIONS.map((c) => (
-              <CuisineChip
-                key={c}
-                label={c}
-                active={cuisines.some((x) => x.toLowerCase() === c.toLowerCase())}
-                onClick={() => toggleCuisine(c)}
-              />
-            ))}
-            {customSelected.map((c) => (
-              <CuisineChip key={c} label={c} active onClick={() => toggleCuisine(c)} />
-            ))}
-          </div>
-          <div className="mt-2 flex gap-2">
-            <Input
-              placeholder="Add another cuisine…"
-              value={customCuisine}
-              onChange={(e) => setCustomCuisine(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addCustomCuisine();
-                }
-              }}
-            />
-            <Button variant="ghost" onClick={addCustomCuisine} disabled={!customCuisine.trim()}>
-              Add
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field
-            label="Dietary flags"
-            info="Diets every meal must follow. Comma-separated, e.g. vegetarian, vegan, gluten-free, dairy-free. Leave blank for no restrictions."
-          >
-            <Input
-              placeholder="e.g. vegetarian, gluten-free"
-              value={flags}
-              onChange={(e) => setFlags(e.target.value)}
-            />
-          </Field>
-          <Field
-            label="Avoid"
-            info="Ingredients or things to keep out, in plain words — e.g. no mushrooms, no shellfish, not too spicy. The planner works around these."
-          >
-            <Input
-              placeholder="e.g. no mushrooms, no pork"
-              value={avoid}
-              onChange={(e) => setAvoid(e.target.value)}
-            />
-          </Field>
-        </div>
-
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button
             data-testid="generate"
             onClick={onGenerate}
-            disabled={!householdId || mealTypes.length === 0 || busy === "generate"}
+            disabled={!householdId || mealTypes.length === 0 || generating}
           >
-            {busy === "generate"
-              ? genStatus === "running"
-                ? "Running…"
-                : genStatus === "queued"
-                  ? "Queued…"
-                  : "Starting…"
-              : "Generate plan"}
+            {genLabel}
           </Button>
-          {busy === "generate" && (
+          <button
+            type="button"
+            onClick={() => setCustomizeOpen((o) => !o)}
+            className="text-sm font-medium text-muted hover:text-ink"
+            data-testid="plan-customize"
+          >
+            {customizeOpen ? "Hide options ▴" : "Customize ▾"}
+          </button>
+          {generating && (
             <span className="text-sm text-muted">
               job {genStatus ?? "queued"} — this can take 30–60s for multi-day plans
             </span>
           )}
         </div>
+
+        {customizeOpen && (
+          <div className="mt-5 border-t border-line pt-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Field label="Start">
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </Field>
+              <Field label="End">
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              </Field>
+              <Field label="Household size">
+                <Input
+                  type="number"
+                  min={1}
+                  value={size}
+                  onChange={(e) => setSize(Number(e.target.value))}
+                />
+              </Field>
+              <Field label="Budget ($)">
+                <Input value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="optional" />
+              </Field>
+            </div>
+
+            <div className="mt-4">
+              <SectionLabel>Meals</SectionLabel>
+              <div className="mt-2 flex flex-wrap gap-3 text-sm">
+                {MEAL_TYPES.map((m) => (
+                  <label key={m} className="flex items-center gap-1.5 capitalize">
+                    <input
+                      type="checkbox"
+                      checked={mealTypes.includes(m)}
+                      onChange={() => toggleMeal(m)}
+                      className="accent-accent"
+                    />
+                    {m}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <span className="flex items-center gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  Cuisines
+                </span>
+                <InfoTip label="Cuisines">
+                  Cuisines you&apos;d like the plan to lean toward. Most meals will be on-list,
+                  with the occasional wildcard for variety. Leave empty for no preference.
+                </InfoTip>
+              </span>
+              <div className="mt-2">
+                <CuisineSelector selected={cuisines} onChange={setCuisines} />
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field
+                label="Dietary flags"
+                info="Diets every meal must follow. Comma-separated, e.g. vegetarian, vegan, gluten-free, dairy-free. Leave blank for no restrictions."
+              >
+                <Input
+                  placeholder="e.g. vegetarian, gluten-free"
+                  value={flags}
+                  onChange={(e) => setFlags(e.target.value)}
+                />
+              </Field>
+              <Field
+                label="Avoid"
+                info="Ingredients or things to keep out, in plain words — e.g. no mushrooms, no shellfish, not too spicy. The planner works around these."
+              >
+                <Input
+                  placeholder="e.g. no mushrooms, no pork"
+                  value={avoid}
+                  onChange={(e) => setAvoid(e.target.value)}
+                />
+              </Field>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Plan */}
@@ -301,46 +296,29 @@ export default function PlanPage() {
   );
 }
 
-// Curated cuisine set (mirrors the generator's defaults, plus common extras).
-// Users can add anything else via the free-text field.
-const CUISINE_OPTIONS = [
-  "Italian",
-  "Mexican",
-  "Indian",
-  "Thai",
-  "Mediterranean",
-  "Japanese",
-  "Chinese",
-  "Korean",
-  "American",
-  "French",
-  "Middle Eastern",
-  "Greek",
-];
-
-function CuisineChip({
-  label,
-  active,
-  onClick,
+function summary({
+  size,
+  mealTypes,
+  startDate,
+  endDate,
+  budget,
+  cuisines,
 }: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-        active
-          ? "border-accent bg-accent text-white"
-          : "border-line bg-surface text-ink hover:bg-surface-2"
-      }`}
-    >
-      {label}
-    </button>
-  );
+  size: number;
+  mealTypes: MealType[];
+  startDate: string;
+  endDate: string;
+  budget: string;
+  cuisines: string[];
+}): string {
+  const parts = [
+    `${size} ${size === 1 ? "person" : "people"}`,
+    mealTypes.length ? mealTypes.join(", ") : "no meals selected",
+    `${shortDate(startDate)}–${shortDate(endDate)}`,
+  ];
+  if (budget) parts.push(`~$${budget}`);
+  if (cuisines.length) parts.push(cuisines.slice(0, 3).join(", ") + (cuisines.length > 3 ? "…" : ""));
+  return parts.join(" · ");
 }
 
 function Field({
