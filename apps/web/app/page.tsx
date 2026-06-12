@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { api, type Dashboard, type UpcomingMeal } from "../lib/api";
-import { Button, Card } from "../components/ui";
+import { Button, Card, Thumb } from "../components/ui";
 import { SectionLabel } from "./shell";
 import { useWorkspace } from "./workspace";
 
@@ -115,14 +115,17 @@ function DashboardGrid({ data }: { data: Dashboard | null }) {
         <SectionLabel>Up next</SectionLabel>
         {tonight ? (
           <>
-            <Link href={`/recipe/${tonight.recipe_id}`}>
-              <h3 className="mt-2 font-display text-xl font-semibold tracking-tight hover:text-accent-ink">
-                {tonight.recipe_title}
-              </h3>
+            <Link href={`/recipe/${tonight.recipe_id}`} className="mt-2 flex items-center gap-3">
+              <Thumb src={tonight.image_url} alt={tonight.recipe_title} size={56} />
+              <span>
+                <span className="block font-display text-xl font-semibold tracking-tight hover:text-accent-ink">
+                  {tonight.recipe_title}
+                </span>
+                <span className="mt-0.5 block text-sm text-muted">
+                  {titleCase(tonight.meal_type)} · {shortDate(tonight.date)}
+                </span>
+              </span>
             </Link>
-            <p className="mt-1 text-sm text-muted">
-              {titleCase(tonight.meal_type)} · {shortDate(tonight.date)}
-            </p>
             <div className="mt-4 flex gap-2">
               <Link href="/plan">
                 <Button>Cook</Button>
@@ -216,11 +219,17 @@ function DashboardGrid({ data }: { data: Dashboard | null }) {
 
 function UpNextRow({ meal }: { meal: UpcomingMeal }) {
   return (
-    <li className="flex items-baseline justify-between gap-3 border-b border-line/60 pb-1.5 last:border-0">
-      <span className="truncate">{meal.recipe_title}</span>
-      <span className="shrink-0 text-xs text-muted">
-        {titleCase(meal.meal_type)} · {shortDate(meal.date)}
-      </span>
+    <li className="border-b border-line/60 pb-1.5 last:border-0">
+      <Link
+        href={`/recipe/${meal.recipe_id}`}
+        className="flex items-center gap-2.5 hover:text-accent-ink"
+      >
+        <Thumb src={meal.image_url} alt={meal.recipe_title} size={32} />
+        <span className="truncate">{meal.recipe_title}</span>
+        <span className="ml-auto shrink-0 text-xs text-muted">
+          {titleCase(meal.meal_type)} · {shortDate(meal.date)}
+        </span>
+      </Link>
     </li>
   );
 }

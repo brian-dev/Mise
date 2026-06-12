@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { MEAL_TYPES, type MealType } from "@mise/shared";
 
-import { Button, Card, Input } from "../../components/ui";
+import { Button, Card, Input, Thumb } from "../../components/ui";
 import { SectionLabel } from "../shell";
 import { useWorkspace } from "../workspace";
 
@@ -180,9 +180,10 @@ export default function PlanPage() {
                       data-testid="meal-row"
                       className="flex flex-wrap items-center gap-2 border-b border-line/60 py-1.5 text-sm last:border-0"
                     >
-                      <span className="w-20 shrink-0 text-xs uppercase tracking-wide text-muted">
+                      <span className="w-16 shrink-0 text-xs uppercase tracking-wide text-muted">
                         {m.meal_type}
                       </span>
+                      <Thumb src={m.image_url} alt={m.recipe_title} size={36} />
                       <Link
                         href={`/recipe/${m.recipe_id}`}
                         data-testid="recipe-title"
