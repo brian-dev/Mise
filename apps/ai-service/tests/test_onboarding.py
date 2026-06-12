@@ -18,6 +18,7 @@ from mise_ai.db import (
     get_current_consents,
     get_household_profile,
     log_event,
+    onboarding_status,
     record_consent,
     update_household_profile,
 )
@@ -120,6 +121,33 @@ def test_log_event_persists_properties(conn: psycopg.Connection) -> None:
         row = cur.fetchone()
     assert row[0] == "plan_generated"  # type: ignore[index]
     assert row[1]["days"] == 5  # type: ignore[index]
+
+
+@pytest.mark.db
+def test_onboarding_status_lifecycle(conn: psycopg.Connection) -> None:
+    with conn.cursor() as cur:
+        uid = _user(cur)
+
+    # No households yet -> needs onboarding, nothing to reuse.
+    s = onboarding_status(conn, uid)
+    assert s == {"needs_onboarding": True, "household_id": None}
+
+    # Owns an incomplete household -> still needs onboarding, reuse that one.
+    with conn.cursor() as cur:
+        cur.execute("insert into households (name) values ('HH') returning id")
+        hid = cur.fetchone()[0]
+        cur.execute(
+            "insert into household_members (household_id, user_id, role) "
+            "values (%s, %s, 'owner')",
+            (hid, uid),
+        )
+    s = onboarding_status(conn, uid)
+    assert s == {"needs_onboarding": True, "household_id": hid}
+
+    # Complete it -> no longer needs onboarding.
+    update_household_profile(conn, hid, {"household_size": 2}, complete_onboarding=True)
+    s = onboarding_status(conn, uid)
+    assert s == {"needs_onboarding": False, "household_id": None}
 
 
 # ---- Endpoint validation (no DB) -------------------------------------------- #

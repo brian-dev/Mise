@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { api } from "../lib/api";
+import { api, type OnboardingStatus } from "../lib/api";
 import { Login, SignOutButton, useSession } from "./auth";
+import { OnboardingWizard } from "./onboarding/wizard";
 import { THEMES, useTheme, type Theme } from "./theme";
 import { useWorkspace, WorkspaceProvider } from "./workspace";
 
@@ -25,9 +26,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <WorkspaceProvider>
       <ThemeSync />
-      <Chrome email={session.user.email}>{children}</Chrome>
+      <OnboardingGate>
+        <Chrome email={session.user.email}>{children}</Chrome>
+      </OnboardingGate>
     </WorkspaceProvider>
   );
+}
+
+/** First-run gate: new users (no completed household) go through the onboarding
+ *  wizard before reaching the app. Best-effort — any error falls through to the
+ *  app rather than trapping the user. */
+function OnboardingGate({ children }: { children: React.ReactNode }) {
+  const [status, setStatus] = useState<OnboardingStatus | null>(null);
+  useEffect(() => {
+    api
+      .onboardingStatus()
+      .then(setStatus)
+      .catch(() => setStatus({ needs_onboarding: false, household_id: null }));
+  }, []);
+
+  if (status === null) return null; // loading
+  if (status.needs_onboarding) return <OnboardingWizard status={status} />;
+  return <>{children}</>;
 }
 
 /** On sign-in, pull the user's saved theme from their profile and apply it, so the

@@ -42,6 +42,7 @@ from .db import (
     latest_meal_plan_id,
     list_households,
     log_event,
+    onboarding_status,
     meal_swap_context,
     persist_meal_plan,
     record_consent,
@@ -132,6 +133,21 @@ def put_theme(
 # Onboarding: household profile, consent ledger, analytics events.
 # --------------------------------------------------------------------------- #
 _CONSENT_KINDS = {"personalization", "analytics", "data_sharing", "marketing"}
+
+
+class OnboardingStatus(BaseModel):
+    needs_onboarding: bool
+    household_id: UUID | None
+
+
+@app.get("/v1/me/onboarding", response_model=OnboardingStatus)
+def me_onboarding(user: UUID | None = Depends(current_user)) -> OnboardingStatus:
+    """Whether the signed-in user should see the onboarding wizard."""
+    if user is None:
+        return OnboardingStatus(needs_onboarding=False, household_id=None)
+    with connect() as conn:
+        s = onboarding_status(conn, user)
+    return OnboardingStatus(**s)
 
 
 class HouseholdProfile(BaseModel):

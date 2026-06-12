@@ -85,6 +85,13 @@ def seed_plan(user: UUID | None = Depends(current_user)) -> SeedResponse:
     stock the pantry — no Claude. Returns the ids an E2E test needs."""
     with connect() as conn:
         household_id = create_household(conn, "E2E Household", owner_user_id=user)["id"]
+        # Mark onboarding complete so the seeded user lands straight in the app
+        # (the wizard only gates households that haven't finished onboarding).
+        with conn.cursor() as cur:
+            cur.execute(
+                "update households set onboarding_completed_at = now() where id = %s",
+                (household_id,),
+            )
         req, plan = _deterministic_plan(household_id)
         meal_plan_id = persist_meal_plan(conn, plan, req)
         with conn.cursor() as cur:
