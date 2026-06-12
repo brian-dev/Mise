@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "../../lib/api";
 import { Card } from "../../components/ui";
 import { SectionLabel } from "../shell";
 import { THEME_LABELS, THEMES, useTheme, type Theme } from "../theme";
@@ -7,11 +8,20 @@ import { THEME_LABELS, THEMES, useTheme, type Theme } from "../theme";
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
 
+  // Apply locally (instant) and persist to the profile so it follows across
+  // devices. Persistence is best-effort — the local change stands regardless.
+  const choose = (t: Theme) => {
+    setTheme(t);
+    void api.setMyTheme(t).catch(() => {});
+  };
+
   return (
     <Card className="p-5">
       <SectionLabel>Appearance</SectionLabel>
       <h3 className="mt-2 font-display text-lg font-semibold">Theme</h3>
-      <p className="mt-1 text-sm text-muted">Pick the look that suits you. Saved on this device.</p>
+      <p className="mt-1 text-sm text-muted">
+        Pick the look that suits you. Saved to your account and synced across devices.
+      </p>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="theme-picker">
         {THEMES.map((t) => (
@@ -19,7 +29,7 @@ export default function SettingsPage() {
             key={t}
             theme={t}
             active={t === theme}
-            onSelect={() => setTheme(t)}
+            onSelect={() => choose(t)}
           />
         ))}
       </div>

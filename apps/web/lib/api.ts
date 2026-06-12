@@ -174,6 +174,12 @@ export interface GenerateRequest {
 }
 
 export const api = {
+  getMyTheme: () => req<{ theme: string | null }>("/v1/me/theme"),
+  setMyTheme: (theme: string) =>
+    req<{ theme: string | null }>("/v1/me/theme", {
+      method: "PUT",
+      body: JSON.stringify({ theme }),
+    }),
   listHouseholds: () => req<Household[]>("/v1/households"),
   createHousehold: (name: string) =>
     req<Household>("/v1/households", { method: "POST", body: JSON.stringify({ name }) }),
