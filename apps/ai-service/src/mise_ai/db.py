@@ -463,6 +463,33 @@ _PROFILE_FIELDS = (
 )
 
 
+def onboarding_status(conn: psycopg.Connection, user_id: UUID) -> dict[str, Any]:
+    """Whether this user still needs onboarding, and which household to fill.
+
+    Needs onboarding = the user owns no household that has completed it. The
+    target is the most recent not-yet-completed household to reuse (so a half-
+    finished run doesn't spawn duplicates), or None to create a fresh one.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select h.id, h.onboarding_completed_at
+            from households h
+            join household_members m on m.household_id = h.id
+            where m.user_id = %s and m.role = 'owner'
+            order by h.created_at desc
+            """,
+            (user_id,),
+        )
+        rows = cur.fetchall()
+    completed = any(r[1] is not None for r in rows)
+    incomplete = next((r[0] for r in rows if r[1] is None), None)
+    return {
+        "needs_onboarding": not completed,
+        "household_id": None if completed else incomplete,
+    }
+
+
 def get_household_profile(conn: psycopg.Connection, household_id: UUID) -> dict[str, Any]:
     with conn.cursor() as cur:
         cur.execute(

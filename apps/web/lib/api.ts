@@ -20,6 +20,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.text();
     throw new Error(`${res.status} ${res.statusText}: ${body}`);
   }
+  // 204 No Content (PUT/POST writes) has no body to parse.
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -165,6 +167,34 @@ export interface Dashboard {
   };
 }
 
+export interface OnboardingStatus {
+  needs_onboarding: boolean;
+  household_id: string | null;
+}
+
+export interface HouseholdProfile {
+  name?: string;
+  household_size: number | null;
+  weekly_budget: string | null;
+  preferred_cuisines: string[] | null;
+  preferred_meal_types: string[] | null;
+  cooking_time: string | null;
+  dietary_flags: string[] | null;
+  avoid_text: string | null;
+  region: string | null;
+  store_preference: string | null;
+  onboarding_completed_at?: string | null;
+}
+
+export type ProfileUpdate = Partial<Omit<HouseholdProfile, "name" | "onboarding_completed_at">> & {
+  complete_onboarding?: boolean;
+};
+
+export interface ConsentDecision {
+  kind: string;
+  granted: boolean;
+}
+
 export interface GenerateRequest {
   household_id: string;
   start_date: string;
@@ -201,6 +231,25 @@ export const api = {
   getJob: (id: string) => req<JobStatus>(`/v1/jobs/${id}`),
   getMealPlan: (id: string) => req<MealPlanDetail>(`/v1/meal-plans/${id}`),
   getRecipe: (id: string) => req<RecipeDetail>(`/v1/recipes/${id}`),
+  onboardingStatus: () => req<OnboardingStatus>("/v1/me/onboarding"),
+  getProfile: (householdId: string) =>
+    req<HouseholdProfile>(`/v1/households/${householdId}/profile`),
+  putProfile: (householdId: string, body: ProfileUpdate) =>
+    req<void>(`/v1/households/${householdId}/profile`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getConsents: () => req<Record<string, boolean>>("/v1/me/consents"),
+  postConsents: (version: string, decisions: ConsentDecision[]) =>
+    req<void>("/v1/me/consents", {
+      method: "POST",
+      body: JSON.stringify({ version, decisions }),
+    }),
+  logEvent: (event_type: string, householdId?: string, properties?: Record<string, unknown>) =>
+    req<void>("/v1/events", {
+      method: "POST",
+      body: JSON.stringify({ event_type, household_id: householdId ?? null, properties: properties ?? {} }),
+    }),
   // The household's latest plan, or null when there's none (404).
   getLatestPlan: async (householdId: string): Promise<MealPlanDetail | null> => {
     try {

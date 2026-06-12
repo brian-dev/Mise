@@ -10,15 +10,15 @@ const API = process.env.E2E_API_URL ?? "http://localhost:8000";
 test("sign up, seed a plan, see it, cook a meal", async ({ page }) => {
   const email = `e2e-${Date.now()}@mise.test`;
 
-  // 1. Sign up through the UI.
+  // 1. Sign up through the UI. New users land on the (required) onboarding wizard.
   await page.goto("/");
   await page.getByTestId("login-email").fill(email);
   await page.getByTestId("login-password").fill("password123");
   await page.getByTestId("login-signup").click();
-  await expect(page.getByTestId("user-email")).toHaveText(email);
+  await expect(page.getByTestId("onboarding-next")).toBeVisible();
 
-  // 2. Seed a household + plan deterministically via the test hook, using the
-  //    signed-in session token from the browser.
+  // 2. Seed a household + plan deterministically via the test hook (also marks
+  //    onboarding complete), using the signed-in session token from the browser.
   const seeded = await page.evaluate(async (api) => {
     const raw = localStorage.getItem(
       Object.keys(localStorage).find((k) => k.endsWith("-auth-token"))!,
@@ -32,9 +32,10 @@ test("sign up, seed a plan, see it, cook a meal", async ({ page }) => {
   }, API);
   expect(seeded.meal_plan_id).toBeTruthy();
 
-  // 3. Reload, select the seeded household (switcher lives in the app header),
-  //    then open the Plan tab — its plan loads (no regeneration).
+  // 3. Reload — onboarding is complete, so the app loads. Confirm we're signed in,
+  //    select the seeded household, then open the Plan tab (its plan loads).
   await page.reload();
+  await expect(page.getByTestId("user-email")).toHaveText(email);
   await page
     .getByTestId("household-select")
     .selectOption({ label: "E2E Household" });
