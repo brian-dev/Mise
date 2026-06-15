@@ -18,6 +18,12 @@ function todayISO(offsetDays = 0): string {
   return d.toISOString().slice(0, 10);
 }
 
+function addDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function PlanPage() {
   const router = useRouter();
   const {
@@ -36,7 +42,8 @@ export default function PlanPage() {
 
   const [newName, setNewName] = useState("");
   const [startDate, setStartDate] = useState(todayISO());
-  const [endDate, setEndDate] = useState(todayISO(2));
+  const [days, setDays] = useState(3);
+  const endDate = addDays(startDate, days - 1);
   const [size, setSize] = useState(2);
   const [mealTypes, setMealTypes] = useState<MealType[]>(["dinner"]);
   const [flags, setFlags] = useState("");
@@ -122,7 +129,9 @@ export default function PlanPage() {
       {/* Generate — defaults from the profile; details behind "Customize". */}
       <Card className="p-5">
         <SectionLabel>Generate a plan</SectionLabel>
-        <p className="mt-2 text-sm text-muted">{summary({ size, mealTypes, startDate, endDate, budget, cuisines })}</p>
+        <p className="mt-2 text-sm text-muted">
+          {summary({ size, mealTypes, startDate, endDate, days, budget, cuisines })}
+        </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button
@@ -153,8 +162,16 @@ export default function PlanPage() {
               <Field label="Start">
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </Field>
-              <Field label="End">
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <Field label="Days">
+                <Input
+                  type="number"
+                  min={1}
+                  max={14}
+                  value={days}
+                  onChange={(e) =>
+                    setDays(Math.min(14, Math.max(1, Number(e.target.value) || 1)))
+                  }
+                />
               </Field>
               <Field label="Household size">
                 <Input
@@ -301,6 +318,7 @@ function summary({
   mealTypes,
   startDate,
   endDate,
+  days,
   budget,
   cuisines,
 }: {
@@ -308,13 +326,17 @@ function summary({
   mealTypes: MealType[];
   startDate: string;
   endDate: string;
+  days: number;
   budget: string;
   cuisines: string[];
 }): string {
+  const dateLabel =
+    days === 1 ? shortDate(startDate) : `${shortDate(startDate)}–${shortDate(endDate)}`;
   const parts = [
+    `${days} ${days === 1 ? "day" : "days"}`,
     `${size} ${size === 1 ? "person" : "people"}`,
     mealTypes.length ? mealTypes.join(", ") : "no meals selected",
-    `${shortDate(startDate)}–${shortDate(endDate)}`,
+    dateLabel,
   ];
   if (budget) parts.push(`~$${budget}`);
   if (cuisines.length) parts.push(cuisines.slice(0, 3).join(", ") + (cuisines.length > 3 ? "…" : ""));
