@@ -14,6 +14,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [cooking, setCooking] = useState<string | null>(null);
+
   const refresh = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
@@ -30,6 +32,23 @@ export default function HomePage() {
     if (householdId) void refresh(householdId);
     else setLoading(false);
   }, [householdId, refresh]);
+
+  // Cook the meal right from the dashboard and refresh the cards in place.
+  const cook = useCallback(
+    async (mealId: string) => {
+      setCooking(mealId);
+      setError(null);
+      try {
+        await api.cookMeal(mealId);
+        if (householdId) setData(await api.getDashboard(householdId));
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setCooking(null);
+      }
+    },
+    [householdId],
+  );
 
   return (
     <div>
@@ -52,7 +71,7 @@ export default function HomePage() {
       ) : loading && !data ? (
         <p className="text-muted">Loading…</p>
       ) : (
-        <DashboardGrid data={data} />
+        <DashboardGrid data={data} onCook={cook} cooking={cooking} />
       )}
     </div>
   );
@@ -100,7 +119,15 @@ function EmptyHousehold() {
   );
 }
 
-function DashboardGrid({ data }: { data: Dashboard | null }) {
+function DashboardGrid({
+  data,
+  onCook,
+  cooking,
+}: {
+  data: Dashboard | null;
+  onCook: (mealId: string) => void;
+  cooking: string | null;
+}) {
   if (!data) return null;
   const tonight = data.upcoming_meals[0];
   const upNext = data.upcoming_meals.slice(1, 4);
@@ -127,9 +154,9 @@ function DashboardGrid({ data }: { data: Dashboard | null }) {
               </span>
             </Link>
             <div className="mt-4 flex gap-2">
-              <Link href="/plan">
-                <Button>Cook</Button>
-              </Link>
+              <Button onClick={() => onCook(tonight.meal_id)} disabled={cooking !== null}>
+                {cooking === tonight.meal_id ? "Cooking…" : "Cook"}
+              </Button>
               <Link href={`/recipe/${tonight.recipe_id}`}>
                 <Button variant="ghost">View recipe</Button>
               </Link>
