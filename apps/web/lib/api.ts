@@ -104,7 +104,9 @@ export interface ShoppingSummary {
 }
 
 export interface ShoppingItem {
+  id: string;
   name: string;
+  category: string | null;
   quantity_needed: string;
   unit: string;
   estimated_price: string | null;
@@ -265,6 +267,22 @@ export const api = {
       body: JSON.stringify({ meal_plan_id: mealPlanId }),
     }),
   getShoppingList: (id: string) => req<ShoppingListDetail>(`/v1/shopping-lists/${id}`),
+  patchShoppingItem: (
+    listId: string,
+    itemId: string,
+    body: { is_checked?: boolean; quantity?: number },
+  ) =>
+    req<void>(`/v1/shopping-lists/${listId}/items/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  addShoppingItem: (listId: string, body: { name: string; quantity?: number; unit?: string }) =>
+    req<ShoppingItem>(`/v1/shopping-lists/${listId}/items`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteShoppingItem: (listId: string, itemId: string) =>
+    req<void>(`/v1/shopping-lists/${listId}/items/${itemId}`, { method: "DELETE" }),
   estimatePrices: (id: string) =>
     req<unknown>(`/v1/shopping-lists/${id}/estimate-prices`, { method: "POST", body: "{}" }),
   purchase: (id: string) =>

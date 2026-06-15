@@ -61,6 +61,9 @@ interface Workspace {
   buildList: () => Promise<string | null>;
   estimatePrices: () => Promise<void>;
   purchase: () => Promise<void>;
+  toggleItem: (itemId: string, checked: boolean) => Promise<void>;
+  addItem: (name: string) => Promise<void>;
+  removeItem: (itemId: string) => Promise<void>;
   addBarcode: (barcode: string) => Promise<void>;
 }
 
@@ -225,6 +228,50 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [run, shopping, householdId, refreshPantry],
   );
 
+  // Optimistic check/uncheck (instant feedback while shopping); reverts on error.
+  const toggleItem = useCallback(
+    async (itemId: string, checked: boolean) => {
+      if (!shopping) return;
+      const listId = shopping.shopping_list_id;
+      setShopping((s) =>
+        s
+          ? {
+              ...s,
+              items: s.items.map((it) =>
+                it.id === itemId ? { ...it, is_checked: checked } : it,
+              ),
+            }
+          : s,
+      );
+      try {
+        await api.patchShoppingItem(listId, itemId, { is_checked: checked });
+      } catch {
+        setShopping(await api.getShoppingList(listId)); // revert to server truth
+      }
+    },
+    [shopping],
+  );
+
+  const addItem = useCallback(
+    (name: string) =>
+      run("add-item", async () => {
+        if (!shopping) return;
+        await api.addShoppingItem(shopping.shopping_list_id, { name });
+        setShopping(await api.getShoppingList(shopping.shopping_list_id));
+      }),
+    [run, shopping],
+  );
+
+  const removeItem = useCallback(
+    (itemId: string) =>
+      run(`remove-${itemId}`, async () => {
+        if (!shopping) return;
+        await api.deleteShoppingItem(shopping.shopping_list_id, itemId);
+        setShopping(await api.getShoppingList(shopping.shopping_list_id));
+      }),
+    [run, shopping],
+  );
+
   const addBarcode = useCallback(
     (barcode: string) =>
       run("barcode", async () => {
@@ -253,6 +300,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     buildList,
     estimatePrices,
     purchase,
+    toggleItem,
+    addItem,
+    removeItem,
     addBarcode,
   };
 

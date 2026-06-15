@@ -21,8 +21,10 @@ from pydantic import BaseModel, Field
 from .auth import current_user, require_membership
 from .config import settings
 from .db import (
+    add_manual_item,
     add_to_pantry,
     connect,
+    delete_item,
     create_generation_job,
     create_household,
     get_job,
@@ -47,9 +49,11 @@ from .db import (
     persist_meal_plan,
     record_consent,
     recipes_missing_image_for_plan,
+    set_item_checked,
     set_job_status,
     swap_meal_recipe,
     update_household_profile,
+    update_item_quantity,
 )
 from .dashboard import build_dashboard
 from .generation import GenerationError, generate_meal_plan, generate_recipe
@@ -437,6 +441,66 @@ def shopping_list(
             return get_shopping_list(conn, shopping_list_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+def _authz_shopping_list(conn: Any, user: UUID | None, shopping_list_id: UUID) -> None:
+    try:
+        require_membership(conn, user, household_for_shopping_list(conn, shopping_list_id))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+class ItemPatch(BaseModel):
+    is_checked: bool | None = None
+    quantity: Decimal | None = None
+
+
+@app.patch("/v1/shopping-lists/{shopping_list_id}/items/{item_id}", status_code=204)
+def patch_item(
+    shopping_list_id: UUID,
+    item_id: UUID,
+    req: ItemPatch,
+    user: UUID | None = Depends(current_user),
+) -> None:
+    """Check/uncheck an item or change its quantity (interactive shopping)."""
+    with connect() as conn:
+        _authz_shopping_list(conn, user, shopping_list_id)
+        if req.is_checked is not None:
+            set_item_checked(conn, shopping_list_id, item_id, req.is_checked)
+        if req.quantity is not None:
+            update_item_quantity(conn, shopping_list_id, item_id, req.quantity)
+
+
+class ManualItem(BaseModel):
+    name: str
+    quantity: Decimal = Decimal("1")
+    unit: Unit = Unit.unit
+
+
+@app.post("/v1/shopping-lists/{shopping_list_id}/items")
+def add_item(
+    shopping_list_id: UUID,
+    req: ManualItem,
+    user: UUID | None = Depends(current_user),
+) -> dict[str, Any]:
+    """Add a user-typed (manual) item to the list."""
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    with connect() as conn:
+        _authz_shopping_list(conn, user, shopping_list_id)
+        return add_manual_item(conn, shopping_list_id, name, req.quantity, req.unit.value)
+
+
+@app.delete("/v1/shopping-lists/{shopping_list_id}/items/{item_id}", status_code=204)
+def remove_item(
+    shopping_list_id: UUID,
+    item_id: UUID,
+    user: UUID | None = Depends(current_user),
+) -> None:
+    with connect() as conn:
+        _authz_shopping_list(conn, user, shopping_list_id)
+        delete_item(conn, shopping_list_id, item_id)
 
 
 class JobAccepted(BaseModel):
