@@ -419,21 +419,24 @@ def get_shopping_list(conn: psycopg.Connection, shopping_list_id: UUID) -> dict[
             raise ValueError(f"shopping_list {shopping_list_id} not found")
         cur.execute(
             """
-            select i.name, s.quantity_needed, s.unit, s.estimated_price, s.is_checked, s.source
+            select s.id, i.name, i.category, s.quantity_needed, s.unit,
+                   s.estimated_price, s.is_checked, s.source
             from shopping_list_items s join ingredients i on i.id = s.ingredient_id
             where s.shopping_list_id = %s
-            order by i.name
+            order by coalesce(i.category, 'zzz'), i.name
             """,
             (shopping_list_id,),
         )
         items = [
             {
-                "name": r[0],
-                "quantity_needed": r[1],
-                "unit": r[2],
-                "estimated_price": r[3],
-                "is_checked": r[4],
-                "source": r[5],
+                "id": r[0],
+                "name": r[1],
+                "category": r[2],
+                "quantity_needed": r[3],
+                "unit": r[4],
+                "estimated_price": r[5],
+                "is_checked": r[6],
+                "source": r[7],
             }
             for r in cur.fetchall()
         ]
@@ -443,6 +446,87 @@ def get_shopping_list(conn: psycopg.Connection, shopping_list_id: UUID) -> dict[
         "estimated_total": head[1],
         "items": items,
     }
+
+
+def _recompute_list_total(cur: psycopg.Cursor, shopping_list_id: UUID) -> None:
+    """Refresh the stored estimated_total from the current item prices."""
+    cur.execute(
+        """
+        update shopping_lists set estimated_total = coalesce(
+          (select sum(estimated_price) from shopping_list_items
+           where shopping_list_id = %s), 0)
+        where id = %s
+        """,
+        (shopping_list_id, shopping_list_id),
+    )
+
+
+def set_item_checked(
+    conn: psycopg.Connection, shopping_list_id: UUID, item_id: UUID, is_checked: bool
+) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            "update shopping_list_items set is_checked = %s "
+            "where id = %s and shopping_list_id = %s",
+            (is_checked, item_id, shopping_list_id),
+        )
+
+
+def update_item_quantity(
+    conn: psycopg.Connection, shopping_list_id: UUID, item_id: UUID, quantity: Decimal
+) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            "update shopping_list_items set quantity_needed = %s "
+            "where id = %s and shopping_list_id = %s",
+            (quantity, item_id, shopping_list_id),
+        )
+
+
+def add_manual_item(
+    conn: psycopg.Connection,
+    shopping_list_id: UUID,
+    name: str,
+    quantity: Decimal,
+    unit: str,
+) -> dict[str, Any]:
+    """Add a user-typed item to the list (canonicalized ingredient, source=manual,
+    no price). Returns the created item row for the UI."""
+    with conn.transaction(), conn.cursor() as cur:
+        ingredient_id = canonicalize_ingredient(cur, name, None)
+        cur.execute(
+            """
+            insert into shopping_list_items
+              (shopping_list_id, ingredient_id, quantity_needed, unit, source)
+            values (%s, %s, %s, %s, 'manual')
+            returning id
+            """,
+            (shopping_list_id, ingredient_id, quantity, unit),
+        )
+        item_id = cur.fetchone()[0]  # type: ignore[index]
+        cur.execute("select name, category from ingredients where id = %s", (ingredient_id,))
+        iname, category = cur.fetchone()  # type: ignore[misc]
+    return {
+        "id": item_id,
+        "name": iname,
+        "category": category,
+        "quantity_needed": quantity,
+        "unit": unit,
+        "estimated_price": None,
+        "is_checked": False,
+        "source": "manual",
+    }
+
+
+def delete_item(
+    conn: psycopg.Connection, shopping_list_id: UUID, item_id: UUID
+) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            "delete from shopping_list_items where id = %s and shopping_list_id = %s",
+            (item_id, shopping_list_id),
+        )
+        _recompute_list_total(cur, shopping_list_id)
 
 
 # --------------------------------------------------------------------------- #
