@@ -254,6 +254,11 @@ export const api = {
       method: "POST",
     }),
   removeMeal: (mealId: string) => req<void>(`/v1/meals/${mealId}`, { method: "DELETE" }),
+  addMeal: (planId: string, date: string, mealType: MealType) =>
+    req<MealPlanDetail>(`/v1/meal-plans/${planId}/days/${date}/meals`, {
+      method: "POST",
+      body: JSON.stringify({ meal_type: mealType }),
+    }),
   getRecipe: (id: string) => req<RecipeDetail>(`/v1/recipes/${id}`),
   onboardingStatus: () => req<OnboardingStatus>("/v1/me/onboarding"),
   getProfile: (householdId: string) =>

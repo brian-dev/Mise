@@ -345,6 +345,26 @@ def delete_meal(conn: psycopg.Connection, meal_id: UUID) -> None:
         cur.execute("delete from meals where id = %s", (meal_id,))
 
 
+def add_meal_to_day(
+    conn: psycopg.Connection,
+    day_id: UUID,
+    meal_type: str,
+    recipe: GeneratedRecipe,
+    servings: int,
+) -> UUID:
+    """Persist a recipe and add it as a new meal slot on the day. Returns meal id."""
+    with conn.transaction(), conn.cursor() as cur:
+        recipe_id = _persist_recipe(cur, recipe)
+        cur.execute(
+            """
+            insert into meals (meal_plan_day_id, meal_type, recipe_id, servings)
+            values (%s, %s, %s, %s) returning id
+            """,
+            (day_id, meal_type, recipe_id, servings),
+        )
+        return cast(UUID, cur.fetchone()[0])  # type: ignore[index]
+
+
 def add_to_pantry(
     conn: psycopg.Connection,
     household_id: UUID,
