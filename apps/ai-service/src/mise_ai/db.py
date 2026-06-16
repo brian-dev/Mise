@@ -191,10 +191,13 @@ def get_recipe_for_prompt(conn: psycopg.Connection, recipe_id: UUID) -> dict[str
     }
 
 
-def get_recipe_detail(conn: psycopg.Connection, recipe_id: UUID) -> dict[str, Any]:
+def get_recipe_detail(
+    conn: psycopg.Connection, recipe_id: UUID, user_id: UUID | None = None
+) -> dict[str, Any]:
     """Full recipe for the UI: header, instructions, image, and ingredients
     (name + quantity + unit). Distinct from `get_recipe_for_prompt`, which shapes
-    the recipe for re-prompting."""
+    the recipe for re-prompting. When `user_id` is given, includes that user's
+    personal favorite flag + note."""
     with conn.cursor() as cur:
         cur.execute(
             "select title, description, cuisine_tags, prep_time, cook_time, "
@@ -217,6 +220,21 @@ def get_recipe_detail(conn: psycopg.Connection, recipe_id: UUID) -> dict[str, An
             {"name": row[0], "quantity": row[1], "unit": row[2], "is_optional": row[3]}
             for row in cur.fetchall()
         ]
+
+        is_favorite = False
+        note: str | None = None
+        if user_id is not None:
+            cur.execute(
+                "select 1 from recipe_favorites where user_id = %s and recipe_id = %s",
+                (user_id, recipe_id),
+            )
+            is_favorite = cur.fetchone() is not None
+            cur.execute(
+                "select note from recipe_notes where user_id = %s and recipe_id = %s",
+                (user_id, recipe_id),
+            )
+            nrow = cur.fetchone()
+            note = nrow[0] if nrow is not None else None
     return {
         "recipe_id": recipe_id,
         "title": r[0],
@@ -228,6 +246,8 @@ def get_recipe_detail(conn: psycopg.Connection, recipe_id: UUID) -> dict[str, An
         "instructions": r[6],
         "image_url": r[7],
         "ingredients": ingredients,
+        "is_favorite": is_favorite,
+        "note": note,
     }
 
 
@@ -255,6 +275,45 @@ def set_recipe_image(conn: psycopg.Connection, recipe_id: UUID, image_url: str) 
         cur.execute(
             "update recipes set image_url = %s where id = %s", (image_url, recipe_id)
         )
+
+
+def set_recipe_favorite(
+    conn: psycopg.Connection, user_id: UUID, recipe_id: UUID, favorite: bool
+) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        if favorite:
+            cur.execute(
+                "insert into recipe_favorites (user_id, recipe_id) values (%s, %s) "
+                "on conflict do nothing",
+                (user_id, recipe_id),
+            )
+        else:
+            cur.execute(
+                "delete from recipe_favorites where user_id = %s and recipe_id = %s",
+                (user_id, recipe_id),
+            )
+
+
+def set_recipe_note(
+    conn: psycopg.Connection, user_id: UUID, recipe_id: UUID, note: str
+) -> None:
+    """Upsert the user's note; an empty/blank note clears it."""
+    with conn.transaction(), conn.cursor() as cur:
+        if note.strip():
+            cur.execute(
+                """
+                insert into recipe_notes (user_id, recipe_id, note)
+                values (%s, %s, %s)
+                on conflict (user_id, recipe_id)
+                do update set note = excluded.note, updated_at = now()
+                """,
+                (user_id, recipe_id, note.strip()),
+            )
+        else:
+            cur.execute(
+                "delete from recipe_notes where user_id = %s and recipe_id = %s",
+                (user_id, recipe_id),
+            )
 
 
 def swap_meal_recipe(

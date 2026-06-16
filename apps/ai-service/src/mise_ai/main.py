@@ -58,6 +58,8 @@ from .db import (
     set_item_checked,
     set_job_status,
     set_pantry_quantity,
+    set_recipe_favorite,
+    set_recipe_note,
     swap_meal_recipe,
     update_household_profile,
     update_item_quantity,
@@ -457,16 +459,18 @@ class RecipeDetail(BaseModel):
     instructions: str | None
     image_url: str | None
     ingredients: list[RecipeIngredientOut]
+    is_favorite: bool = False
+    note: str | None = None
 
 
 @app.get("/v1/recipes/{recipe_id}", response_model=RecipeDetail)
 def recipe(recipe_id: UUID, user: UUID | None = Depends(current_user)) -> RecipeDetail:
     """Full recipe for the detail screen. Recipes live in a shared pool, so this is
-    auth-only (not household-scoped). On first view, lazily resolves a
-    representative photo (Pexels, keyed title→cuisine) and stores it."""
+    auth-only (not household-scoped). Includes the caller's favorite flag + note.
+    On first view, lazily resolves a representative photo (Pexels) and stores it."""
     try:
         with connect() as conn:
-            detail = get_recipe_detail(conn, recipe_id)
+            detail = get_recipe_detail(conn, recipe_id, user_id=user)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -479,6 +483,41 @@ def recipe(recipe_id: UUID, user: UUID | None = Depends(current_user)) -> Recipe
             detail["image_url"] = image_url
 
     return RecipeDetail(**detail)
+
+
+@app.put("/v1/recipes/{recipe_id}/favorite", status_code=204)
+def favorite_recipe(
+    recipe_id: UUID, user: UUID | None = Depends(current_user)
+) -> None:
+    if user is None:
+        raise HTTPException(status_code=401, detail="authentication required")
+    with connect() as conn:
+        set_recipe_favorite(conn, user, recipe_id, True)
+
+
+@app.delete("/v1/recipes/{recipe_id}/favorite", status_code=204)
+def unfavorite_recipe(
+    recipe_id: UUID, user: UUID | None = Depends(current_user)
+) -> None:
+    if user is None:
+        raise HTTPException(status_code=401, detail="authentication required")
+    with connect() as conn:
+        set_recipe_favorite(conn, user, recipe_id, False)
+
+
+class NoteUpdate(BaseModel):
+    note: str
+
+
+@app.put("/v1/recipes/{recipe_id}/note", status_code=204)
+def note_recipe(
+    recipe_id: UUID, req: NoteUpdate, user: UUID | None = Depends(current_user)
+) -> None:
+    """Save (or clear, when blank) the caller's personal note on a recipe."""
+    if user is None:
+        raise HTTPException(status_code=401, detail="authentication required")
+    with connect() as conn:
+        set_recipe_note(conn, user, recipe_id, req.note)
 
 
 @app.get("/v1/shopping-lists/{shopping_list_id}")
