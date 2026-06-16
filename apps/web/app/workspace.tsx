@@ -65,6 +65,9 @@ interface Workspace {
   addItem: (name: string) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   addBarcode: (barcode: string) => Promise<void>;
+  addPantryItem: (name: string, quantity: number, unit: string) => Promise<void>;
+  updatePantryItem: (itemId: string, quantity: number) => Promise<void>;
+  removePantryItem: (itemId: string) => Promise<void>;
 }
 
 const KEY = "mise-household";
@@ -282,6 +285,36 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [run, householdId, refreshPantry],
   );
 
+  const addPantryItem = useCallback(
+    (name: string, quantity: number, unit: string) =>
+      run("pantry-add", async () => {
+        if (!householdId || !name.trim()) return;
+        await api.addPantryItem(householdId, { name: name.trim(), quantity, unit });
+        await refreshPantry(householdId);
+      }),
+    [run, householdId, refreshPantry],
+  );
+
+  const updatePantryItem = useCallback(
+    (itemId: string, quantity: number) =>
+      run(`pantry-${itemId}`, async () => {
+        if (!householdId) return;
+        await api.updatePantryItem(householdId, itemId, quantity);
+        await refreshPantry(householdId);
+      }),
+    [run, householdId, refreshPantry],
+  );
+
+  const removePantryItem = useCallback(
+    (itemId: string) =>
+      run(`pantry-${itemId}`, async () => {
+        if (!householdId) return;
+        await api.deletePantryItem(householdId, itemId);
+        await refreshPantry(householdId);
+      }),
+    [run, householdId, refreshPantry],
+  );
+
   const value: Workspace = {
     households,
     householdId,
@@ -304,6 +337,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     addItem,
     removeItem,
     addBarcode,
+    addPantryItem,
+    updatePantryItem,
+    removePantryItem,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

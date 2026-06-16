@@ -25,6 +25,7 @@ from .db import (
     add_to_pantry,
     connect,
     delete_item,
+    delete_pantry_item,
     create_generation_job,
     create_household,
     get_job,
@@ -51,6 +52,7 @@ from .db import (
     recipes_missing_image_for_plan,
     set_item_checked,
     set_job_status,
+    set_pantry_quantity,
     swap_meal_recipe,
     update_household_profile,
     update_item_quantity,
@@ -291,6 +293,51 @@ def pantry(
     with connect() as conn:
         require_membership(conn, user, household_id)
         return get_pantry(conn, household_id)
+
+
+class PantryAdd(BaseModel):
+    name: str
+    quantity: Decimal = Decimal("1")
+    unit: Unit = Unit.unit
+
+
+@app.post("/v1/households/{household_id}/pantry")
+def add_pantry_item(
+    household_id: UUID, req: PantryAdd, user: UUID | None = Depends(current_user)
+) -> dict[str, Any]:
+    """Manually add an item to the pantry by name (canonicalized; upsert by
+    ingredient+unit)."""
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    with connect() as conn:
+        require_membership(conn, user, household_id)
+        return add_to_pantry(conn, household_id, name, req.quantity, req.unit.value)
+
+
+class PantryUpdate(BaseModel):
+    quantity: Decimal = Field(ge=0)
+
+
+@app.patch("/v1/households/{household_id}/pantry/{item_id}", status_code=204)
+def update_pantry_item(
+    household_id: UUID,
+    item_id: UUID,
+    req: PantryUpdate,
+    user: UUID | None = Depends(current_user),
+) -> None:
+    with connect() as conn:
+        require_membership(conn, user, household_id)
+        set_pantry_quantity(conn, household_id, item_id, req.quantity)
+
+
+@app.delete("/v1/households/{household_id}/pantry/{item_id}", status_code=204)
+def remove_pantry_item(
+    household_id: UUID, item_id: UUID, user: UUID | None = Depends(current_user)
+) -> None:
+    with connect() as conn:
+        require_membership(conn, user, household_id)
+        delete_pantry_item(conn, household_id, item_id)
 
 
 class ProductResponse(BaseModel):

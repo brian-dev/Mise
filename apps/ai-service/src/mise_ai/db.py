@@ -296,14 +296,37 @@ def get_pantry(conn: psycopg.Connection, household_id: UUID) -> list[dict[str, A
     with conn.cursor() as cur:
         cur.execute(
             """
-            select i.name, p.quantity, p.unit
+            select p.id, i.name, i.category, p.quantity, p.unit
             from pantry_items p join ingredients i on i.id = p.ingredient_id
             where p.household_id = %s
-            order by i.name
+            order by coalesce(i.category, 'zzz'), i.name
             """,
             (household_id,),
         )
-        return [{"name": r[0], "quantity": r[1], "unit": r[2]} for r in cur.fetchall()]
+        return [
+            {"id": r[0], "name": r[1], "category": r[2], "quantity": r[3], "unit": r[4]}
+            for r in cur.fetchall()
+        ]
+
+
+def set_pantry_quantity(
+    conn: psycopg.Connection, household_id: UUID, item_id: UUID, quantity: Decimal
+) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            "update pantry_items set quantity = %s where id = %s and household_id = %s",
+            (quantity, item_id, household_id),
+        )
+
+
+def delete_pantry_item(
+    conn: psycopg.Connection, household_id: UUID, item_id: UUID
+) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            "delete from pantry_items where id = %s and household_id = %s",
+            (item_id, household_id),
+        )
 
 
 def get_meal_plan(conn: psycopg.Connection, meal_plan_id: UUID) -> dict[str, Any]:

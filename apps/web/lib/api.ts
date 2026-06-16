@@ -31,7 +31,9 @@ export interface Household {
 }
 
 export interface PantryItem {
+  id: string;
   name: string;
+  category: string | null;
   quantity: string;
   unit: string;
 }
@@ -225,6 +227,21 @@ export const api = {
       `/v1/households/${householdId}/pantry/add-barcode`,
       { method: "POST", body: JSON.stringify({ barcode }) },
     ),
+  addPantryItem: (
+    householdId: string,
+    body: { name: string; quantity?: number; unit?: string },
+  ) =>
+    req<{ name: string }>(`/v1/households/${householdId}/pantry`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updatePantryItem: (householdId: string, itemId: string, quantity: number) =>
+    req<void>(`/v1/households/${householdId}/pantry/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ quantity }),
+    }),
+  deletePantryItem: (householdId: string, itemId: string) =>
+    req<void>(`/v1/households/${householdId}/pantry/${itemId}`, { method: "DELETE" }),
   generate: (body: GenerateRequest) =>
     req<JobAccepted>("/v1/meal-plans/generate", {
       method: "POST",
