@@ -10,6 +10,7 @@ are stubbed and will be implemented in the first AI-service feature PR:
 """
 
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -28,6 +29,8 @@ from .db import (
     delete_pantry_item,
     create_generation_job,
     create_household,
+    day_regen_context,
+    delete_meal,
     get_job,
     get_current_consents,
     get_household_profile,
@@ -50,6 +53,7 @@ from .db import (
     persist_meal_plan,
     record_consent,
     recipes_missing_image_for_plan,
+    replace_day_meals,
     set_item_checked,
     set_job_status,
     set_pantry_quantity,
@@ -63,7 +67,7 @@ from .openfoodfacts import lookup_product
 from .pexels import search_image
 from .pantry import cook_meal
 from .pricing import PricingError, PricingItem, resolve_prices
-from .schemas import Dietary, MealPlanRequest, PantryItem, RecipeRequest, Unit
+from .schemas import Dietary, MealPlanRequest, MealType, PantryItem, RecipeRequest, Unit
 from .shopping import (
     apply_estimated_prices,
     build_shopping_list,
@@ -858,6 +862,66 @@ def cook(
             for d in result.deductions
         ],
     )
+
+
+@app.delete("/v1/meals/{meal_id}", status_code=204)
+def remove_meal(meal_id: UUID, user: UUID | None = Depends(current_user)) -> None:
+    """Remove a meal slot from a plan (plan editing)."""
+    with connect() as conn:
+        try:
+            household_id = household_for_meal(conn, meal_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        require_membership(conn, user, household_id)
+        delete_meal(conn, meal_id)
+
+
+@app.post("/v1/meal-plans/{meal_plan_id}/days/{day}/regenerate")
+def regenerate_day(
+    meal_plan_id: UUID, day: date, user: UUID | None = Depends(current_user)
+) -> dict[str, Any]:
+    """Regenerate every meal on one day of the plan, driven by the household
+    profile (cuisines / dietary / size) and pantry. Synchronous (one day, ~seconds).
+    Replaces the day's meals in place and returns the updated plan."""
+    with connect() as conn:
+        try:
+            ctx = day_regen_context(conn, meal_plan_id, day)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        require_membership(conn, user, ctx["household_id"])
+        profile = get_household_profile(conn, ctx["household_id"])
+        pantry_rows = get_pantry(conn, ctx["household_id"])
+
+    meal_types = [MealType(m) for m in ctx["meal_types"]] or [MealType.dinner]
+    household_size = profile["household_size"] or ctx["servings"]
+    req = MealPlanRequest(
+        household_id=ctx["household_id"],
+        start_date=day,
+        end_date=day,
+        household_size=household_size,
+        meal_types=meal_types,
+        dietary=Dietary(
+            flags=profile["dietary_flags"] or [], avoid_text=profile["avoid_text"]
+        ),
+        pantry=[
+            PantryItem(name=p["name"], quantity=float(p["quantity"]), unit=Unit(p["unit"]))
+            for p in pantry_rows
+        ],
+        cuisines=profile["preferred_cuisines"] or [],
+    )
+    try:
+        result = generate_meal_plan(req)
+    except GenerationError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    with connect() as conn:
+        replace_day_meals(conn, ctx["day_id"], result.plan.days[0], household_size)
+    try:
+        _populate_plan_images(meal_plan_id)
+    except Exception:  # noqa: BLE001
+        pass
+    with connect() as conn:
+        return get_meal_plan(conn, meal_plan_id)
 
 
 class SwapRequest(BaseModel):

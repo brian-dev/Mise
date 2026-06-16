@@ -249,6 +249,11 @@ export const api = {
     }),
   getJob: (id: string) => req<JobStatus>(`/v1/jobs/${id}`),
   getMealPlan: (id: string) => req<MealPlanDetail>(`/v1/meal-plans/${id}`),
+  regenerateDay: (planId: string, date: string) =>
+    req<MealPlanDetail>(`/v1/meal-plans/${planId}/days/${date}/regenerate`, {
+      method: "POST",
+    }),
+  removeMeal: (mealId: string) => req<void>(`/v1/meals/${mealId}`, { method: "DELETE" }),
   getRecipe: (id: string) => req<RecipeDetail>(`/v1/recipes/${id}`),
   onboardingStatus: () => req<OnboardingStatus>("/v1/me/onboarding"),
   getProfile: (householdId: string) =>

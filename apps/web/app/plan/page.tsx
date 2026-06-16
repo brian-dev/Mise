@@ -37,6 +37,8 @@ export default function PlanPage() {
     cook,
     swap,
     iterate,
+    regenerateDay,
+    removeMeal,
     buildList,
   } = useWorkspace();
 
@@ -262,7 +264,16 @@ export default function PlanPage() {
           <div className="mt-3 space-y-4">
             {plan.days.map((d) => (
               <div key={d.date}>
-                <div className="font-display text-base font-semibold">{shortDate(d.date)}</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-display text-base font-semibold">{shortDate(d.date)}</div>
+                  <SmallButton
+                    data-testid="regenerate-day"
+                    onClick={() => regenerateDay(d.date)}
+                    disabled={!!busy}
+                  >
+                    {busy === `regen-${d.date}` ? "Regenerating…" : "↻ Regenerate day"}
+                  </SmallButton>
+                </div>
                 <ul className="mt-1.5 space-y-1.5">
                   {d.meals.map((m) => (
                     <li
@@ -300,6 +311,15 @@ export default function PlanPage() {
                             </SmallButton>
                           </>
                         )}
+                        <button
+                          onClick={() => removeMeal(m.meal_id)}
+                          disabled={!!busy}
+                          aria-label={`Remove ${m.recipe_title}`}
+                          data-testid="remove-meal"
+                          className="text-muted hover:text-accent-ink disabled:opacity-50"
+                        >
+                          ✕
+                        </button>
                       </span>
                     </li>
                   ))}

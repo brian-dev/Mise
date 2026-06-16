@@ -9,6 +9,7 @@ unique constraint.
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
@@ -17,7 +18,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from .config import settings
-from .schemas import GeneratedMealPlan, GeneratedRecipe, MealPlanRequest
+from .schemas import GeneratedDay, GeneratedMealPlan, GeneratedRecipe, MealPlanRequest
 
 
 def connect() -> psycopg.Connection:
@@ -265,6 +266,83 @@ def swap_meal_recipe(
         recipe_id = _persist_recipe(cur, recipe)
         cur.execute("update meals set recipe_id = %s where id = %s", (recipe_id, meal_id))
     return recipe_id
+
+
+def day_regen_context(
+    conn: psycopg.Connection, meal_plan_id: UUID, day: date
+) -> dict[str, Any]:
+    """What a single-day regeneration needs: the day row, household, the meal types
+    to refill (the slots already on that day), a representative servings, and the
+    other days' recipe titles (to bias away from repeats)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select d.id, mp.household_id
+            from meal_plan_days d join meal_plans mp on mp.id = d.meal_plan_id
+            where d.meal_plan_id = %s and d.date = %s
+            """,
+            (meal_plan_id, day),
+        )
+        row = cur.fetchone()
+        if row is None:
+            raise ValueError(f"day {day} not found in meal_plan {meal_plan_id}")
+        day_id, household_id = row
+
+        cur.execute(
+            "select meal_type, servings from meals where meal_plan_day_id = %s "
+            "order by meal_type",
+            (day_id,),
+        )
+        rows = cur.fetchall()
+        meal_types = [r[0] for r in rows]
+        servings = max((r[1] for r in rows), default=2)
+
+        cur.execute(
+            """
+            select distinct r.title
+            from meals m
+            join meal_plan_days d on d.id = m.meal_plan_day_id
+            join recipes r on r.id = m.recipe_id
+            where d.meal_plan_id = %s and d.id <> %s
+            """,
+            (meal_plan_id, day_id),
+        )
+        avoid_titles = [r[0] for r in cur.fetchall()]
+    return {
+        "day_id": day_id,
+        "household_id": household_id,
+        "meal_types": meal_types,
+        "servings": servings,
+        "avoid_titles": avoid_titles,
+    }
+
+
+def replace_day_meals(
+    conn: psycopg.Connection, day_id: UUID, day: GeneratedDay, default_servings: int
+) -> None:
+    """Swap out all meals on a day for freshly generated ones (single transaction).
+    Recipes are de-duplicated within the day by title, like persist_meal_plan."""
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute("delete from meals where meal_plan_day_id = %s", (day_id,))
+        recipe_ids: dict[str, UUID] = {}
+        for meal in day.meals:
+            key = meal.recipe.title.strip().lower()
+            recipe_id = recipe_ids.get(key)
+            if recipe_id is None:
+                recipe_id = _persist_recipe(cur, meal.recipe)
+                recipe_ids[key] = recipe_id
+            cur.execute(
+                """
+                insert into meals (meal_plan_day_id, meal_type, recipe_id, servings)
+                values (%s, %s, %s, %s)
+                """,
+                (day_id, meal.meal_type.value, recipe_id, meal.servings or default_servings),
+            )
+
+
+def delete_meal(conn: psycopg.Connection, meal_id: UUID) -> None:
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute("delete from meals where id = %s", (meal_id,))
 
 
 def add_to_pantry(
