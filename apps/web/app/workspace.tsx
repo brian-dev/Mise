@@ -60,6 +60,7 @@ interface Workspace {
   iterate: (mealId: string, modify: string) => Promise<void>;
   regenerateDay: (date: string) => Promise<void>;
   removeMeal: (mealId: string) => Promise<void>;
+  addMeal: (date: string, mealType: MealType) => Promise<void>;
   buildList: () => Promise<string | null>;
   estimatePrices: () => Promise<void>;
   purchase: () => Promise<void>;
@@ -219,6 +220,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [run, plan],
   );
 
+  const addMeal = useCallback(
+    (date: string, mealType: MealType) =>
+      run(`add-meal-${date}`, async () => {
+        if (!plan) return;
+        setPlan(await api.addMeal(plan.meal_plan_id, date, mealType));
+      }),
+    [run, plan],
+  );
+
   const buildList = useCallback(async (): Promise<string | null> => {
     if (!plan) return null;
     let listId: string | null = null;
@@ -352,6 +362,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     iterate,
     regenerateDay,
     removeMeal,
+    addMeal,
     buildList,
     estimatePrices,
     purchase,

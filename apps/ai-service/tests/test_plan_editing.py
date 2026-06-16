@@ -13,6 +13,7 @@ import psycopg
 import pytest
 
 from mise_ai.db import (
+    add_meal_to_day,
     day_regen_context,
     delete_meal,
     get_meal_plan,
@@ -95,6 +96,18 @@ def test_replace_day_meals(conn: psycopg.Connection) -> None:
     # Day two is untouched.
     day1 = next(d for d in plan["days"] if d["date"] == date(2026, 6, 11))
     assert [m["recipe_title"] for m in day1["meals"]] == ["Day Two Dinner"]
+
+
+def test_add_meal_to_day(conn: psycopg.Connection) -> None:
+    plan_id = _two_day_plan(conn)
+    ctx = day_regen_context(conn, plan_id, date(2026, 6, 10))
+
+    add_meal_to_day(conn, ctx["day_id"], "lunch", _recipe("Extra Lunch"), 2)
+
+    plan = get_meal_plan(conn, plan_id)
+    day0 = next(d for d in plan["days"] if d["date"] == date(2026, 6, 10))
+    by_type = {m["meal_type"]: m["recipe_title"] for m in day0["meals"]}
+    assert by_type == {"dinner": "Day One Dinner", "lunch": "Extra Lunch"}
 
 
 def test_delete_meal(conn: psycopg.Connection) -> None:

@@ -39,6 +39,7 @@ export default function PlanPage() {
     iterate,
     regenerateDay,
     removeMeal,
+    addMeal,
     buildList,
   } = useWorkspace();
 
@@ -324,11 +325,47 @@ export default function PlanPage() {
                     </li>
                   ))}
                 </ul>
+                <AddMealControl
+                  busy={busy === `add-meal-${d.date}`}
+                  disabled={!!busy}
+                  onAdd={(mt) => addMeal(d.date, mt)}
+                />
               </div>
             ))}
           </div>
         </Card>
       )}
+    </div>
+  );
+}
+
+function AddMealControl({
+  busy,
+  disabled,
+  onAdd,
+}: {
+  busy: boolean;
+  disabled: boolean;
+  onAdd: (mealType: MealType) => void;
+}) {
+  const [mealType, setMealType] = useState<MealType>("dinner");
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <select
+        data-testid="add-meal-type"
+        value={mealType}
+        onChange={(e) => setMealType(e.target.value as MealType)}
+        className="rounded border border-line bg-surface px-2 py-1 text-xs text-ink"
+      >
+        {MEAL_TYPES.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <SmallButton data-testid="add-meal" onClick={() => onAdd(mealType)} disabled={disabled}>
+        {busy ? "Adding…" : "+ Add meal"}
+      </SmallButton>
     </div>
   );
 }

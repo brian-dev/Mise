@@ -23,6 +23,7 @@ from .auth import current_user, require_membership
 from .config import settings
 from .db import (
     add_manual_item,
+    add_meal_to_day,
     add_to_pantry,
     connect,
     delete_item,
@@ -916,6 +917,55 @@ def regenerate_day(
 
     with connect() as conn:
         replace_day_meals(conn, ctx["day_id"], result.plan.days[0], household_size)
+    try:
+        _populate_plan_images(meal_plan_id)
+    except Exception:  # noqa: BLE001
+        pass
+    with connect() as conn:
+        return get_meal_plan(conn, meal_plan_id)
+
+
+class AddMealRequest(BaseModel):
+    meal_type: MealType = MealType.dinner
+
+
+@app.post("/v1/meal-plans/{meal_plan_id}/days/{day}/meals")
+def add_meal(
+    meal_plan_id: UUID,
+    day: date,
+    req: AddMealRequest,
+    user: UUID | None = Depends(current_user),
+) -> dict[str, Any]:
+    """Add a new meal slot to a day — generates a single recipe (profile dietary +
+    pantry, avoiding the plan's other titles) and inserts it. Returns the plan."""
+    with connect() as conn:
+        try:
+            ctx = day_regen_context(conn, meal_plan_id, day)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        require_membership(conn, user, ctx["household_id"])
+        profile = get_household_profile(conn, ctx["household_id"])
+        pantry = [
+            PantryItem(name=p["name"], quantity=float(p["quantity"]), unit=Unit(p["unit"]))
+            for p in get_pantry(conn, ctx["household_id"])
+        ]
+    servings = profile["household_size"] or ctx["servings"]
+    recipe_req = RecipeRequest(
+        meal_type=req.meal_type,
+        servings=servings,
+        dietary=Dietary(
+            flags=profile["dietary_flags"] or [], avoid_text=profile["avoid_text"]
+        ),
+        pantry=pantry,
+        avoid_titles=ctx["avoid_titles"],
+    )
+    try:
+        result = generate_recipe(recipe_req)
+    except GenerationError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    with connect() as conn:
+        add_meal_to_day(conn, ctx["day_id"], req.meal_type.value, result.recipe, servings)
     try:
         _populate_plan_images(meal_plan_id)
     except Exception:  # noqa: BLE001
