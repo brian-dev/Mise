@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { api, type RecipeDetail } from "../../../lib/api";
-import { Card } from "../../../components/ui";
+import { Button, Card } from "../../../components/ui";
 import { SectionLabel } from "../../shell";
 
 export default function RecipePage() {
@@ -14,16 +14,41 @@ export default function RecipePage() {
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [favorite, setFavorite] = useState(false);
+  const [note, setNote] = useState("");
+  const [savedNote, setSavedNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     api
       .getRecipe(id)
-      .then(setRecipe)
+      .then((r) => {
+        setRecipe(r);
+        setFavorite(r.is_favorite);
+        setNote(r.note ?? "");
+        setSavedNote(r.note ?? "");
+      })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const toggleFavorite = () => {
+    const next = !favorite;
+    setFavorite(next); // optimistic
+    void api.setFavorite(id, next).catch(() => setFavorite(!next));
+  };
+
+  const saveNote = async () => {
+    setSavingNote(true);
+    try {
+      await api.saveRecipeNote(id, note);
+      setSavedNote(note);
+    } finally {
+      setSavingNote(false);
+    }
+  };
 
   if (loading) return <p className="text-muted">Loading…</p>;
   if (error)
@@ -57,7 +82,20 @@ export default function RecipePage() {
       )}
 
       <div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">{recipe.title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="font-display text-3xl font-semibold tracking-tight">{recipe.title}</h1>
+          <button
+            onClick={toggleFavorite}
+            aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
+            aria-pressed={favorite}
+            data-testid="favorite-toggle"
+            className={`shrink-0 text-2xl leading-none transition-colors ${
+              favorite ? "text-accent" : "text-muted hover:text-accent-ink"
+            }`}
+          >
+            {favorite ? "♥" : "♡"}
+          </button>
+        </div>
         {recipe.description && (
           <p className="mt-1.5 text-muted">{recipe.description}</p>
         )}
@@ -108,6 +146,33 @@ export default function RecipePage() {
           </ol>
         </Card>
       )}
+
+      <Card className="p-5">
+        <SectionLabel>My notes</SectionLabel>
+        <p className="mt-1 text-xs text-muted">
+          Private to you — tweaks, swaps, what worked last time.
+        </p>
+        <textarea
+          data-testid="recipe-note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. used half the chili, added lime at the end"
+          rows={3}
+          className="mt-2 w-full resize-y rounded border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted outline-none focus:border-accent"
+        />
+        <div className="mt-2 flex items-center gap-3">
+          <Button
+            data-testid="save-note"
+            onClick={saveNote}
+            disabled={savingNote || note === savedNote}
+          >
+            {savingNote ? "Saving…" : "Save note"}
+          </Button>
+          {note === savedNote && savedNote !== "" && (
+            <span className="text-sm text-good">✓ Saved</span>
+          )}
+        </div>
+      </Card>
     </article>
   );
 }

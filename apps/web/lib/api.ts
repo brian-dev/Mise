@@ -66,6 +66,8 @@ export interface RecipeDetail {
   instructions: string | null;
   image_url: string | null;
   ingredients: RecipeIngredient[];
+  is_favorite: boolean;
+  note: string | null;
 }
 
 export interface PlanDay {
@@ -260,6 +262,15 @@ export const api = {
       body: JSON.stringify({ meal_type: mealType }),
     }),
   getRecipe: (id: string) => req<RecipeDetail>(`/v1/recipes/${id}`),
+  setFavorite: (recipeId: string, favorite: boolean) =>
+    req<void>(`/v1/recipes/${recipeId}/favorite`, {
+      method: favorite ? "PUT" : "DELETE",
+    }),
+  saveRecipeNote: (recipeId: string, note: string) =>
+    req<void>(`/v1/recipes/${recipeId}/note`, {
+      method: "PUT",
+      body: JSON.stringify({ note }),
+    }),
   onboardingStatus: () => req<OnboardingStatus>("/v1/me/onboarding"),
   getProfile: (householdId: string) =>
     req<HouseholdProfile>(`/v1/households/${householdId}/profile`),
