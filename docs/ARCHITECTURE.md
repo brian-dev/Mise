@@ -289,14 +289,17 @@ Client compares total vs budget → UI warning if over
 
 ### Flow 4 — Cook a meal (pantry depletion)
 ```
-Client → DB: update meal.cooked_at (direct)
-If depletion mode = auto:
-  for each recipe ingredient:
-     deduct = qty × (meal.servings / recipe.default_servings)
-     if partial-use likely → prompt user to confirm actual amount
-  Client → DB: update pantry_items quantities (direct)
-If manual: user edits pantry directly later
+Client → AI Service: GET /v1/meals/{id}/cook-preview
+   ← per ingredient: planned = qty × (meal.servings / recipe.default_servings),
+     on-hand, reason = partial (fractional can/item/bunch) | short (on-hand < planned)
+If any reason is set (auto mode only) → client asks the user to confirm those amounts
+Client → AI Service: POST /v1/meals/{id}/cook { overrides? }
+   → marks cooked; in auto mode deducts planned (or the override) per ingredient,
+     floored at 0; a draft plan becomes active
+If manual: marks cooked only; user edits pantry directly later
 ```
+(Implemented in the AI service rather than direct client→DB writes, so the
+depletion math and plan-status rules live in one place.)
 
 ---
 

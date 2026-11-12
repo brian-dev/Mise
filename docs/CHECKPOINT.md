@@ -1,6 +1,6 @@
 # Project Checkpoint
 
-> **Last Updated:** 2026-06-03
+> **Last Updated:** 2026-11-12
 > Purpose: orient a fresh session quickly. Read this first, then the docs it points to.
 
 ## What Mise is
@@ -193,10 +193,56 @@ Next.js (web) · Expo/React Native (mobile) · `@mise/shared` TS package · Supa
      in AI_LAYER §11**: blended ≈ **$0.093/generation** → free tier (≤5/mo) ≈ **$0.47/user/month**
      (comfortable; a ~5/mo cap is safe). Output tokens dominate. Finding: prompt caching is a
      no-op today (stable prefix < Sonnet's 2048 cache min + parallel calls fire concurrently).
-   - TODO next: Android (Expo) + mobile barcode camera scan; per-household price calibration;
-     sign-out-on-auth-error polish; entitlement gating for paid pricing tiers (with billing).
    - Android: Expo Go on a physical device can point at the same API (LAN IP + add origin to
      `cors_origins`); not built yet.
+
+5. **Real web app on the design system** (#27–#43, replacing the dev harness; `UX_DESIGN.md` §7):
+   - ✅ IA + low-fi wireframes (#27); Warm Editorial design tokens + user-selectable themes (#28),
+     theme persisted to the user profile so it syncs across devices (#32, migration `0008`).
+   - ✅ App shell + navigation: Home dashboard, Plan, Shopping, Pantry, Settings (#30). Dashboard
+     (#29): plan summary, upcoming meals, alerts (use-soon via category shelf life — migration
+     `0006`, running-low, needed-not-stocked); cook-in-place from Home (#39).
+   - ✅ Recipe detail screen + representative Pexels images (#31, migration `0007`), thumbnails
+     across dashboard + plan with eager image fill (#33).
+   - ✅ Onboarding (#36–#38, migration `0009`): household profile columns, append-only consent
+     ledger, analytics events; a **required** 8-step post-signup wizard; the profile pre-fills the
+     Plan form (one-line summary + "Customize") and is editable in Settings. Preferred cuisines
+     feed generation (#35). Plan length is a "Days" control (#39).
+   - ✅ Interactive shopping list — check off, manual items, remove, grouped by category (#40).
+   - ✅ Pantry CRUD — manual add, inline quantity edit, remove, grouped (#41).
+   - ✅ Plan editing — regenerate a single day, remove a meal (#42), add a meal slot (#43).
+
+6. **v1 web gaps** (2026-11-12):
+   - ✅ Meal plan status lifecycle `draft → active → closed` (branch `feat/plan-status-lifecycle`,
+     spec §3.2). `plans.py`: activate (closes the previously active plan; row locks serialize
+     concurrent activations against the one-active index), close, lazy auto-close once a plan's
+     end date is past (+`plan_autoclose_grace_days`=1, because the DB's `current_date` is UTC
+     while plan dates are local days). The **current plan** = newest non-closed plan, used by
+     `latest-plan` and the dashboard. `POST /v1/meal-plans/{id}/activate|close` (409 on bad
+     transitions); cook + shopping build activate a draft; closed plans are read-only (409 on
+     cook/swap/iterate/remove/add/regenerate-day/build). Web: status badge, Start plan / Discard
+     draft / Close plan, draft hint. 12 pytest + E2E.
+   - ✅ Partial-use prompt at cook time (branch `feat/cook-partial-use`, spec §3.4).
+     `GET /v1/meals/{id}/cook-preview` lists what cooking would deduct and flags **partial**
+     (fractional can/item/bunch) and **short** (less on hand than needed); manual mode flags
+     nothing. Web `useCookFlow` cooks in one tap when nothing is flagged, else a dialog confirms
+     the flagged amounts (quick picks "Just ½ can" / "Used all I had") and sends them as
+     `overrides` (now validated ≥ 0). Plan tab + dashboard. 6 pytest + E2E (cancel + confirm).
+   - ✅ Fix: web pinned `@types/react` 18.3.11 while mobile hoisted 18.3.30, so `next/link` types
+     failed the web typecheck (TS2786). Aligned to `~18.3.12`.
+
+## Next steps
+1. **Android (Expo)** on the same tokens/kit via NativeWind (UX_DESIGN §7 step 6) + camera
+   barcode scan — the biggest remaining v1 parity gap (`apps/mobile` is still a stub).
+2. **Per-household price calibration** (spec §3.6) — `households.price_calibration` exists but
+   has no UX or logic yet; needs a lightweight anchor-item flow.
+3. **Component tests** — CLAUDE.md requires Vitest + RTL for `apps/web`; none exist yet. Good
+   first targets: `CookDialog`, the plan status actions, the shopping list.
+4. Plan history view (closed plans are kept but not browsable yet); sign-out on auth error;
+   entitlement gating for paid pricing tiers (with billing, v2).
+5. Known pre-existing nits: `ruff` flags an unsorted import block in `main.py` and long lines in
+   `tests/test_plan_editing.py` (lint isn't part of the merge gate); the dashboard's "upcoming"
+   query compares plan dates to UTC `current_date`.
 
 ## Local toolchain (added 2026-06-04)
 - pnpm 9.15.0 (via corepack), uv 0.11.19 (brew). Node 20 (nvm). Root `.npmrc` sets `node-linker=hoisted` (Expo/RN need a flat node_modules under pnpm).
