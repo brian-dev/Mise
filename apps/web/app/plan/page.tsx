@@ -8,6 +8,7 @@ import { MEAL_TYPES, type MealPlanStatus, type MealType } from "@mise/shared";
 
 import { api } from "../../lib/api";
 import { Button, Card, InfoTip, Input, Thumb } from "../../components/ui";
+import { useCookFlow } from "../../components/cook-dialog";
 import { CuisineSelector } from "../../components/cuisine-selector";
 import { SectionLabel } from "../shell";
 import { useWorkspace } from "../workspace";
@@ -45,6 +46,7 @@ export default function PlanPage() {
     closePlan,
   } = useWorkspace();
 
+  const cookFlow = useCookFlow(cook);
   const [newName, setNewName] = useState("");
   const [startDate, setStartDate] = useState(todayISO());
   const [days, setDays] = useState(3);
@@ -346,8 +348,14 @@ export default function PlanPage() {
                           </span>
                         ) : readOnly ? null : (
                           <>
-                            <SmallButton data-testid="cook" onClick={() => cook(m.meal_id)} disabled={!!busy}>
-                              Cook
+                            <SmallButton
+                              data-testid="cook"
+                              onClick={() => void cookFlow.start(m.meal_id)}
+                              disabled={!!busy || cookFlow.checking !== null}
+                            >
+                              {busy === `cook-${m.meal_id}` || cookFlow.checking === m.meal_id
+                                ? "Cooking…"
+                                : "Cook"}
                             </SmallButton>
                             <SmallButton data-testid="swap" onClick={() => swap(m.meal_id)} disabled={!!busy}>
                               {busy === `swap-${m.meal_id}` ? "Swapping…" : "Swap"}
@@ -384,6 +392,7 @@ export default function PlanPage() {
           </div>
         </Card>
       )}
+      {cookFlow.dialog}
     </div>
   );
 }

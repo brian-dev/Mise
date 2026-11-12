@@ -55,7 +55,7 @@ interface Workspace {
   error: string | null;
 
   generate: (input: GenerateInput) => Promise<void>;
-  cook: (mealId: string) => Promise<void>;
+  cook: (mealId: string, overrides?: Record<string, number>) => Promise<void>;
   swap: (mealId: string) => Promise<void>;
   iterate: (mealId: string, modify: string) => Promise<void>;
   regenerateDay: (date: string) => Promise<void>;
@@ -177,9 +177,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   const cook = useCallback(
-    (mealId: string) =>
+    (mealId: string, overrides?: Record<string, number>) =>
       run(`cook-${mealId}`, async () => {
-        await api.cookMeal(mealId);
+        await api.cookMeal(mealId, overrides);
         if (plan) setPlan(await api.getMealPlan(plan.meal_plan_id));
         await refreshPantry(householdId);
       }),
