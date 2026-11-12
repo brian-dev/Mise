@@ -1,7 +1,7 @@
 // Thin client for the Mise AI service (local dev harness).
 // Base URL overridable via NEXT_PUBLIC_API_URL.
 
-import type { MealType } from "@mise/shared";
+import type { MealPlanStatus, MealType } from "@mise/shared";
 
 import { supabase } from "./supabase";
 
@@ -75,7 +75,7 @@ export interface PlanDay {
 
 export interface MealPlanDetail {
   meal_plan_id: string;
-  status: string;
+  status: MealPlanStatus;
   start_date: string;
   end_date: string;
   budget: string | null;
@@ -249,6 +249,12 @@ export const api = {
     }),
   getJob: (id: string) => req<JobStatus>(`/v1/jobs/${id}`),
   getMealPlan: (id: string) => req<MealPlanDetail>(`/v1/meal-plans/${id}`),
+  // Lifecycle (spec §3.2): starting a draft closes the previously active plan;
+  // closing keeps the plan for history, read-only.
+  activatePlan: (id: string) =>
+    req<MealPlanDetail>(`/v1/meal-plans/${id}/activate`, { method: "POST" }),
+  closePlan: (id: string) =>
+    req<MealPlanDetail>(`/v1/meal-plans/${id}/close`, { method: "POST" }),
   regenerateDay: (planId: string, date: string) =>
     req<MealPlanDetail>(`/v1/meal-plans/${planId}/days/${date}/regenerate`, {
       method: "POST",
@@ -279,7 +285,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ event_type, household_id: householdId ?? null, properties: properties ?? {} }),
     }),
-  // The household's latest plan, or null when there's none (404).
+  // The household's current plan (newest not-closed), or null when there's none (404).
   getLatestPlan: async (householdId: string): Promise<MealPlanDetail | null> => {
     try {
       return await req<MealPlanDetail>(`/v1/households/${householdId}/latest-plan`);

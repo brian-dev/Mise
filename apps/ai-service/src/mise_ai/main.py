@@ -46,7 +46,6 @@ from .db import (
     household_for_meal,
     household_for_meal_plan,
     household_for_shopping_list,
-    latest_meal_plan_id,
     list_households,
     log_event,
     onboarding_status,
@@ -67,6 +66,15 @@ from .generation import GenerationError, generate_meal_plan, generate_recipe
 from .openfoodfacts import lookup_product
 from .pexels import search_image
 from .pantry import cook_meal
+from .plans import (
+    PlanStateError,
+    activate_plan,
+    close_plan,
+    current_meal_plan_id,
+    ensure_active,
+    ensure_open,
+    plan_for_meal,
+)
 from .pricing import PricingError, PricingItem, resolve_prices
 from .schemas import Dietary, MealPlanRequest, MealType, PantryItem, RecipeRequest, Unit
 from .shopping import (
@@ -91,6 +99,22 @@ if settings.test_mode:
     from .test_routes import router as test_router
 
     app.include_router(test_router)
+
+
+def _guard_open(conn: Any, meal_plan_id: UUID) -> None:
+    """Closed plans are read-only (spec §3.2) -> 409."""
+    try:
+        ensure_open(conn, meal_plan_id)
+    except PlanStateError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+
+
+def _guard_active(conn: Any, meal_plan_id: UUID) -> None:
+    """Committing actions activate a draft; a closed plan -> 409."""
+    try:
+        ensure_active(conn, meal_plan_id)
+    except PlanStateError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
 
 @app.get("/v1/health")
@@ -417,14 +441,43 @@ def dashboard(
 def latest_plan(
     household_id: UUID, user: UUID | None = Depends(current_user)
 ) -> dict[str, Any]:
-    """The household's most recent meal plan (404 if none) — lets the UI show an
-    existing plan without regenerating."""
+    """The household's current plan — its newest non-closed plan (404 if none).
+    Plans past their last day are auto-closed first (spec §3.2), so a finished or
+    closed plan leads the UI back to the empty "generate a plan" state."""
     with connect() as conn:
         require_membership(conn, user, household_id)
-        pid = latest_meal_plan_id(conn, household_id)
+        pid = current_meal_plan_id(conn, household_id)
         if pid is None:
             raise HTTPException(status_code=404, detail="no meal plan for this household")
         return get_meal_plan(conn, pid)
+
+
+def _plan_transition(meal_plan_id: UUID, user: UUID | None, action: Any) -> dict[str, Any]:
+    with connect() as conn:
+        try:
+            require_membership(conn, user, household_for_meal_plan(conn, meal_plan_id))
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        try:
+            action(conn, meal_plan_id)
+        except PlanStateError as e:
+            raise HTTPException(status_code=409, detail=str(e)) from e
+        return get_meal_plan(conn, meal_plan_id)
+
+
+@app.post("/v1/meal-plans/{meal_plan_id}/activate")
+def activate(meal_plan_id: UUID, user: UUID | None = Depends(current_user)) -> dict[str, Any]:
+    """Start a draft plan: it becomes the household's active plan and any previously
+    active plan is closed (one active per household). Idempotent when already active;
+    409 for a closed or already-ended plan. Returns the plan."""
+    return _plan_transition(meal_plan_id, user, activate_plan)
+
+
+@app.post("/v1/meal-plans/{meal_plan_id}/close")
+def close(meal_plan_id: UUID, user: UUID | None = Depends(current_user)) -> dict[str, Any]:
+    """Close a draft or active plan — it's kept for history and becomes read-only.
+    409 if already closed. Returns the plan."""
+    return _plan_transition(meal_plan_id, user, close_plan)
 
 
 @app.get("/v1/meal-plans/{meal_plan_id}")
@@ -705,6 +758,7 @@ def build_list(
     try:
         with connect() as conn:
             require_membership(conn, user, household_for_meal_plan(conn, req.meal_plan_id))
+            _guard_active(conn, req.meal_plan_id)
             result = build_shopping_list(conn, req.meal_plan_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -850,6 +904,7 @@ def cook(
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         require_membership(conn, user, household_id)
+        _guard_active(conn, plan_for_meal(conn, meal_id))
         try:
             result = cook_meal(conn, meal_id, overrides)
         except ValueError as e:
@@ -874,6 +929,7 @@ def remove_meal(meal_id: UUID, user: UUID | None = Depends(current_user)) -> Non
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         require_membership(conn, user, household_id)
+        _guard_open(conn, plan_for_meal(conn, meal_id))
         delete_meal(conn, meal_id)
 
 
@@ -890,6 +946,7 @@ def regenerate_day(
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         require_membership(conn, user, ctx["household_id"])
+        _guard_open(conn, meal_plan_id)
         profile = get_household_profile(conn, ctx["household_id"])
         pantry_rows = get_pantry(conn, ctx["household_id"])
 
@@ -944,6 +1001,7 @@ def add_meal(
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         require_membership(conn, user, ctx["household_id"])
+        _guard_open(conn, meal_plan_id)
         profile = get_household_profile(conn, ctx["household_id"])
         pantry = [
             PantryItem(name=p["name"], quantity=float(p["quantity"]), unit=Unit(p["unit"]))
@@ -1003,6 +1061,7 @@ def swap(
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         require_membership(conn, user, ctx["household_id"])
+        _guard_open(conn, plan_for_meal(conn, meal_id))
         pantry = [
             PantryItem(name=p["name"], quantity=float(p["quantity"]), unit=Unit(p["unit"]))
             for p in get_pantry(conn, ctx["household_id"])
@@ -1048,6 +1107,7 @@ def iterate(
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         require_membership(conn, user, ctx["household_id"])
+        _guard_open(conn, plan_for_meal(conn, meal_id))
         pantry = [
             PantryItem(name=p["name"], quantity=float(p["quantity"]), unit=Unit(p["unit"]))
             for p in get_pantry(conn, ctx["household_id"])

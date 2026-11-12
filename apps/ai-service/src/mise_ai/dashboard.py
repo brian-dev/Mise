@@ -1,8 +1,9 @@
 """Home-dashboard aggregation (UX_DESIGN.md — Dashboard is the app home).
 
 Builds a single read model for the household home screen: the current plan's
-state, the next few meals to cook, and ingredient alerts. All read-only; the
-caller (main.py) does the membership check.
+state, the next few meals to cook, and ingredient alerts. Read-only apart from
+auto-closing plans past their last day (plans.py); the caller (main.py) does the
+membership check.
 
 Ingredient alerts are three buckets:
   * use_soon          — pantry items whose estimated expiry (added_at + the
@@ -22,6 +23,7 @@ from uuid import UUID
 import psycopg
 
 from .config import settings
+from .plans import current_meal_plan_id
 
 
 def build_dashboard(conn: psycopg.Connection, household_id: UUID) -> dict[str, Any]:
@@ -46,21 +48,17 @@ def build_dashboard(conn: psycopg.Connection, household_id: UUID) -> dict[str, A
 def _latest_plan_summary(
     conn: psycopg.Connection, household_id: UUID
 ) -> dict[str, Any] | None:
+    # The current plan (newest non-closed, after auto-closing expired ones) —
+    # same rule as the Plan tab, so a closed plan drops off the dashboard.
+    current = current_meal_plan_id(conn, household_id)
+    if current is None:
+        return None
     with conn.cursor() as cur:
         cur.execute(
-            """
-            select id, status, start_date, end_date, budget
-            from meal_plans
-            where household_id = %s
-            order by created_at desc
-            limit 1
-            """,
-            (household_id,),
+            "select id, status, start_date, end_date, budget from meal_plans where id = %s",
+            (current,),
         )
-        row = cur.fetchone()
-        if row is None:
-            return None
-        meal_plan_id, status, start_date, end_date, budget = row
+        meal_plan_id, status, start_date, end_date, budget = cur.fetchone()  # type: ignore[misc]
 
         cur.execute(
             """
