@@ -62,6 +62,8 @@ interface Workspace {
   removeMeal: (mealId: string) => Promise<void>;
   addMeal: (date: string, mealType: MealType) => Promise<void>;
   buildList: () => Promise<string | null>;
+  activatePlan: () => Promise<void>;
+  closePlan: () => Promise<void>;
   estimatePrices: () => Promise<void>;
   purchase: () => Promise<void>;
   toggleItem: (itemId: string, checked: boolean) => Promise<void>;
@@ -236,9 +238,33 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const summary = await api.buildShoppingList(plan.meal_plan_id);
       setShopping(await api.getShoppingList(summary.shopping_list_id));
       listId = summary.shopping_list_id;
+      // Building a list starts a draft plan — pick up the new status.
+      setPlan(await api.getMealPlan(plan.meal_plan_id));
     });
     return listId;
   }, [run, plan]);
+
+  const activatePlan = useCallback(
+    () =>
+      run("plan-activate", async () => {
+        if (!plan) return;
+        setPlan(await api.activatePlan(plan.meal_plan_id));
+      }),
+    [run, plan],
+  );
+
+  // Closing drops the plan from view: show whatever is current next (another
+  // open plan, or the empty "generate" state).
+  const closePlan = useCallback(
+    () =>
+      run("plan-close", async () => {
+        if (!plan) return;
+        await api.closePlan(plan.meal_plan_id);
+        setShopping(null);
+        setPlan(await api.getLatestPlan(householdId));
+      }),
+    [run, plan, householdId],
+  );
 
   const estimatePrices = useCallback(
     () =>
@@ -364,6 +390,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     removeMeal,
     addMeal,
     buildList,
+    activatePlan,
+    closePlan,
     estimatePrices,
     purchase,
     toggleItem,

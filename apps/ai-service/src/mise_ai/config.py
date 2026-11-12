@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     running_low_threshold: float = 1.0
     upcoming_meals_limit: int = 6
 
+    # Meal plan lifecycle (plans.py): open plans auto-close this many days after
+    # their end date. The DB's current_date is UTC while plan dates are local
+    # calendar days, so 1 keeps a plan open through its whole last local day.
+    plan_autoclose_grace_days: int = 1
+
     # Test mode (MISE_TEST_MODE=true) mounts /v1/test/* helper endpoints used by
     # E2E tests to reach app states fast and deterministically WITHOUT calling
     # Claude. Never enable in production.

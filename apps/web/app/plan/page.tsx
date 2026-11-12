@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { MEAL_TYPES, type MealType } from "@mise/shared";
+import { MEAL_TYPES, type MealPlanStatus, type MealType } from "@mise/shared";
 
 import { api } from "../../lib/api";
 import { Button, Card, InfoTip, Input, Thumb } from "../../components/ui";
@@ -41,6 +41,8 @@ export default function PlanPage() {
     removeMeal,
     addMeal,
     buildList,
+    activatePlan,
+    closePlan,
   } = useWorkspace();
 
   const [newName, setNewName] = useState("");
@@ -101,6 +103,16 @@ export default function PlanPage() {
     if (modify) void iterate(mealId, modify);
   };
 
+  const onClosePlan = () => {
+    if (!plan) return;
+    const msg =
+      plan.status === "draft"
+        ? "Discard this draft plan? It's kept in history but can't be edited."
+        : "Close this plan? It's kept in history but can't be edited or cooked from.";
+    if (window.confirm(msg)) void closePlan();
+  };
+
+  const readOnly = plan?.status === "closed";
   const generating = busy === "generate";
   const genLabel = generating
     ? genStatus === "running"
@@ -250,30 +262,63 @@ export default function PlanPage() {
       {/* Plan */}
       {plan && (
         <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <SectionLabel>Plan · {plan.status}</SectionLabel>
-            <Button
-              data-testid="build-shopping"
-              variant="ghost"
-              onClick={onBuildList}
-              disabled={busy === "shopping"}
-            >
-              {busy === "shopping" ? "Building…" : "Build shopping list →"}
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <SectionLabel>
+                Plan · {shortDate(plan.start_date)}
+                {plan.end_date !== plan.start_date && `–${shortDate(plan.end_date)}`}
+              </SectionLabel>
+              <StatusBadge status={plan.status} />
+            </div>
+            {!readOnly && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="plan-close"
+                  onClick={onClosePlan}
+                  disabled={!!busy}
+                  className="text-sm font-medium text-muted hover:text-ink disabled:opacity-50"
+                >
+                  {plan.status === "draft" ? "Discard draft" : "Close plan"}
+                </button>
+                {plan.status === "draft" && (
+                  <Button data-testid="plan-activate" onClick={activatePlan} disabled={!!busy}>
+                    {busy === "plan-activate" ? "Starting…" : "Start plan"}
+                  </Button>
+                )}
+                <Button
+                  data-testid="build-shopping"
+                  variant="ghost"
+                  onClick={onBuildList}
+                  disabled={!!busy}
+                >
+                  {busy === "shopping" ? "Building…" : "Build shopping list →"}
+                </Button>
+              </div>
+            )}
           </div>
+          {plan.status === "draft" && (
+            <p data-testid="plan-draft-hint" className="mt-2 text-xs text-muted">
+              Review and tweak the meals, then start the plan — it becomes your active
+              plan and replaces any plan already running. Cooking a meal or building the
+              shopping list starts it too.
+            </p>
+          )}
 
           <div className="mt-3 space-y-4">
             {plan.days.map((d) => (
               <div key={d.date}>
                 <div className="flex items-center justify-between">
                   <div className="font-display text-base font-semibold">{shortDate(d.date)}</div>
-                  <SmallButton
-                    data-testid="regenerate-day"
-                    onClick={() => regenerateDay(d.date)}
-                    disabled={!!busy}
-                  >
-                    {busy === `regen-${d.date}` ? "Regenerating…" : "↻ Regenerate day"}
-                  </SmallButton>
+                  {!readOnly && (
+                    <SmallButton
+                      data-testid="regenerate-day"
+                      onClick={() => regenerateDay(d.date)}
+                      disabled={!!busy}
+                    >
+                      {busy === `regen-${d.date}` ? "Regenerating…" : "↻ Regenerate day"}
+                    </SmallButton>
+                  )}
                 </div>
                 <ul className="mt-1.5 space-y-1.5">
                   {d.meals.map((m) => (
@@ -299,7 +344,7 @@ export default function PlanPage() {
                           <span data-testid="cooked" className="font-medium text-good">
                             ✓ cooked
                           </span>
-                        ) : (
+                        ) : readOnly ? null : (
                           <>
                             <SmallButton data-testid="cook" onClick={() => cook(m.meal_id)} disabled={!!busy}>
                               Cook
@@ -312,30 +357,52 @@ export default function PlanPage() {
                             </SmallButton>
                           </>
                         )}
-                        <button
-                          onClick={() => removeMeal(m.meal_id)}
-                          disabled={!!busy}
-                          aria-label={`Remove ${m.recipe_title}`}
-                          data-testid="remove-meal"
-                          className="text-muted hover:text-accent-ink disabled:opacity-50"
-                        >
-                          ✕
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={() => removeMeal(m.meal_id)}
+                            disabled={!!busy}
+                            aria-label={`Remove ${m.recipe_title}`}
+                            data-testid="remove-meal"
+                            className="text-muted hover:text-accent-ink disabled:opacity-50"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </span>
                     </li>
                   ))}
                 </ul>
-                <AddMealControl
-                  busy={busy === `add-meal-${d.date}`}
-                  disabled={!!busy}
-                  onAdd={(mt) => addMeal(d.date, mt)}
-                />
+                {!readOnly && (
+                  <AddMealControl
+                    busy={busy === `add-meal-${d.date}`}
+                    disabled={!!busy}
+                    onAdd={(mt) => addMeal(d.date, mt)}
+                  />
+                )}
               </div>
             ))}
           </div>
         </Card>
       )}
     </div>
+  );
+}
+
+const STATUS_STYLES: Record<MealPlanStatus, string> = {
+  draft: "border-line bg-surface-2 text-muted",
+  active: "border-transparent bg-accent-soft text-accent-ink",
+  closed: "border-line bg-transparent text-muted",
+};
+
+function StatusBadge({ status }: { status: MealPlanStatus }) {
+  return (
+    <span
+      data-testid="plan-status"
+      data-status={status}
+      className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize ${STATUS_STYLES[status]}`}
+    >
+      {status}
+    </span>
   );
 }
 
