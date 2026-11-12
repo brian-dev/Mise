@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { api, type Dashboard, type UpcomingMeal } from "../lib/api";
+import { useCookFlow } from "../components/cook-dialog";
 import { Button, Card, Thumb } from "../components/ui";
 import { SectionLabel } from "./shell";
 import { useWorkspace } from "./workspace";
@@ -34,12 +35,12 @@ export default function HomePage() {
   }, [householdId, refresh]);
 
   // Cook the meal right from the dashboard and refresh the cards in place.
-  const cook = useCallback(
-    async (mealId: string) => {
+  const doCook = useCallback(
+    async (mealId: string, overrides?: Record<string, number>) => {
       setCooking(mealId);
       setError(null);
       try {
-        await api.cookMeal(mealId);
+        await api.cookMeal(mealId, overrides);
         if (householdId) setData(await api.getDashboard(householdId));
       } catch (e) {
         setError(String(e));
@@ -49,6 +50,8 @@ export default function HomePage() {
     },
     [householdId],
   );
+  // Asks to confirm partial/short amounts first when there are any.
+  const cookFlow = useCookFlow(doCook);
 
   return (
     <div>
@@ -71,8 +74,13 @@ export default function HomePage() {
       ) : loading && !data ? (
         <p className="text-muted">Loading…</p>
       ) : (
-        <DashboardGrid data={data} onCook={cook} cooking={cooking} />
+        <DashboardGrid
+          data={data}
+          onCook={(id) => void cookFlow.start(id)}
+          cooking={cooking ?? cookFlow.checking}
+        />
       )}
+      {cookFlow.dialog}
     </div>
   );
 }

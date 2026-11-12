@@ -49,8 +49,19 @@ test("sign up, seed a plan, see it, cook a meal", async ({ page }) => {
   // A freshly seeded plan is a draft.
   await expect(page.getByTestId("plan-status")).toHaveAttribute("data-status", "draft");
 
-  // Cook the meal → it shows as cooked, and cooking started the plan.
+  // Cook the meal. The seeded pantry has 1 lb onion but the recipe needs 2 lb, so
+  // the partial-use prompt asks how much was used. Cancel leaves it uncooked…
   await page.getByTestId("cook").first().click();
+  await expect(page.getByTestId("cook-dialog")).toBeVisible();
+  await expect(page.getByTestId("cook-dialog-item")).toHaveAttribute("data-reason", "short");
+  await page.getByTestId("cook-dialog-cancel").click();
+  await expect(page.getByTestId("cook-dialog")).toHaveCount(0);
+  await expect(page.getByTestId("cooked")).toHaveCount(0);
+
+  // …confirming the amount marks it cooked, and cooking started the plan.
+  await page.getByTestId("cook").first().click();
+  await page.getByTestId("cook-dialog-amount").fill("1");
+  await page.getByTestId("cook-dialog-confirm").click();
   await expect(page.getByTestId("cooked").first()).toBeVisible();
   await expect(page.getByTestId("plan-status")).toHaveAttribute("data-status", "active");
 

@@ -82,6 +82,25 @@ export interface MealPlanDetail {
   days: PlanDay[];
 }
 
+export interface CookPreviewItem {
+  ingredient_id: string;
+  name: string;
+  unit: string;
+  planned: string; // decimal string, scaled to the meal's servings
+  on_hand: string | null; // matching pantry quantity (same unit), if stocked
+  is_optional: boolean;
+  reason: "partial" | "short" | null;
+}
+
+export interface CookPreview {
+  meal_id: string;
+  mode: "auto" | "manual";
+  servings: number;
+  already_cooked: boolean;
+  needs_confirm: boolean;
+  ingredients: CookPreviewItem[];
+}
+
 export interface JobAccepted {
   job_id: string;
   status: string;
@@ -320,8 +339,13 @@ export const api = {
     req<unknown>(`/v1/shopping-lists/${id}/estimate-prices`, { method: "POST", body: "{}" }),
   purchase: (id: string) =>
     req<unknown>(`/v1/shopping-lists/${id}/purchase`, { method: "POST", body: "{}" }),
-  cookMeal: (mealId: string) =>
-    req<unknown>(`/v1/meals/${mealId}/cook`, { method: "POST", body: "{}" }),
+  // Partial-use prompt (spec §3.4): preview first; send confirmed amounts as overrides.
+  cookPreview: (mealId: string) => req<CookPreview>(`/v1/meals/${mealId}/cook-preview`),
+  cookMeal: (mealId: string, overrides?: Record<string, number>) =>
+    req<unknown>(`/v1/meals/${mealId}/cook`, {
+      method: "POST",
+      body: JSON.stringify(overrides ? { overrides } : {}),
+    }),
   swapMeal: (mealId: string, modify?: string) =>
     req<{ title: string }>(`/v1/meals/${mealId}/swap`, {
       method: "POST",

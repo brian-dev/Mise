@@ -12,7 +12,7 @@ are stubbed and will be implemented in the first AI-service feature PR:
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
@@ -65,7 +65,7 @@ from .dashboard import build_dashboard
 from .generation import GenerationError, generate_meal_plan, generate_recipe
 from .openfoodfacts import lookup_product
 from .pexels import search_image
-from .pantry import cook_meal
+from .pantry import cook_meal, cook_preview
 from .plans import (
     PlanStateError,
     activate_plan,
@@ -875,7 +875,50 @@ def purchase(
 
 class CookRequest(BaseModel):
     # Optional partial-use overrides: ingredient_id -> actual quantity used.
-    overrides: dict[UUID, Decimal] | None = None
+    overrides: dict[UUID, Annotated[Decimal, Field(ge=0)]] | None = None
+
+
+class CookPreviewItem(BaseModel):
+    ingredient_id: UUID
+    name: str
+    unit: str
+    planned: Decimal  # recipe qty scaled to the meal's servings
+    on_hand: Decimal | None  # matching pantry row (same unit), or None
+    is_optional: bool
+    reason: str | None  # "partial" | "short" -> confirm before deducting
+
+
+class CookPreviewResponse(BaseModel):
+    meal_id: UUID
+    mode: str
+    servings: int
+    already_cooked: bool
+    needs_confirm: bool
+    ingredients: list[CookPreviewItem]
+
+
+@app.get("/v1/meals/{meal_id}/cook-preview", response_model=CookPreviewResponse)
+def get_cook_preview(
+    meal_id: UUID, user: UUID | None = Depends(current_user)
+) -> CookPreviewResponse:
+    """What cooking this meal would deduct from the pantry, with the amounts worth
+    confirming flagged (spec §3.4 partial-use prompt). The client cooks straight
+    away when `needs_confirm` is false, else asks and sends `overrides` to /cook."""
+    with connect() as conn:
+        try:
+            require_membership(conn, user, household_for_meal(conn, meal_id))
+            p = cook_preview(conn, meal_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+    items = [CookPreviewItem(**vars(i)) for i in p.ingredients]
+    return CookPreviewResponse(
+        meal_id=p.meal_id,
+        mode=p.mode,
+        servings=p.servings,
+        already_cooked=p.already_cooked,
+        needs_confirm=any(i.reason for i in items),
+        ingredients=items,
+    )
 
 
 class DeductionOut(BaseModel):

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type {
   ButtonHTMLAttributes,
   HTMLAttributes,
@@ -146,5 +147,58 @@ export function Thumb({
         <path d="M18 2c-1.5 0-3 1.8-3 5s1.5 4 3 4v9" />
       </svg>
     </div>
+  );
+}
+
+/** Modal dialog: dimmed backdrop, focus moves into the panel, Escape or a
+ *  backdrop click cancels. Keep content short — this is for quick confirms. */
+export function Dialog({
+  title,
+  onClose,
+  children,
+  ...props
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+} & HTMLAttributes<HTMLDivElement>) {
+  const panel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    panel.current?.querySelector<HTMLElement>("input, button")?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      prev?.focus();
+    };
+  }, [onClose]);
+
+  // Portal to <body> so no transformed/animated ancestor can clip the scrim.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 grid place-items-center px-4"
+      // Theme colors are CSS vars (no alpha channel), so the scrim is a plain rgba.
+      style={{ background: "rgba(20, 16, 12, 0.35)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-lg border border-line bg-surface p-5 shadow-card"
+        {...props}
+      >
+        <h2 className="font-display text-lg font-semibold">{title}</h2>
+        <div className="mt-3">{children}</div>
+      </div>
+    </div>,
+    document.body,
   );
 }
